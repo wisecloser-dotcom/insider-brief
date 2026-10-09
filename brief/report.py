@@ -326,11 +326,14 @@ def ext_links(co: dict) -> str:
     yahoo = f"https://finance.yahoo.com/quote/{quote(tk)}"
     x = f"https://x.com/search?q={quote('$' + tk.replace('-', '.'))}&f=live"
     sa = f"https://stockanalysis.com/stocks/{quote(tk.lower().replace('-', '.'))}/"
-    # Simply Wall St pages need industry + exchange + name in the address, so jump to the
-    # top search result restricted to their US stock pages instead
-    from .news import clean_name
-    sws = ("https://duckduckgo.com/?q=" +
-           quote(f"!ducky site:simplywall.st/stocks/us {tk} {clean_name(co.get('name') or '')}"))
+    # Simply Wall St stock addresses need their exact industry and name slugs, which can't be
+    # built from a ticker, so open their own search for EXCHANGE:TICKER: the exact US listing
+    # comes up first (checked in a browser for NYSE and Nasdaq stocks)
+    exch = (co.get("exchange") or "").split(",")[0].strip().upper()
+    prefix = {"NASDAQ": "NASDAQ", "NYSE": "NYSE", "NYSE AMERICAN": "NYSEAM", "NYSE MKT": "NYSEAM",
+              "NYSEAMERICAN": "NYSEAM", "OTC": "OTCPK"}.get(exch, "")
+    sws_q = (prefix + ":" if prefix else "") + tk.replace("-", ".")
+    sws = f"https://simplywall.st/search?q={quote(sws_q)}"
     links = [("Yahoo Finance", yahoo), ("Stock Analysis", sa), ("Simply Wall St", sws),
              (f"${tk.replace('-', '.')} on X", x)]
     return "<p class=ext>" + "".join(f"<a class=extlink href=\"{e(u)}\">{e(t)}</a>" for t, u in links) + "</p>"
