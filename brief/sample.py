@@ -70,11 +70,17 @@ def companies():
                    {"date": "2026-07-29", "form": "8-K", "what": ["Earnings results"], "url": "https://www.sec.gov/"}]
             news = [{"date": "2026-10-01", "title": "Harbor Grid wins multi-year transmission contract", "source": "Example Energy Daily", "url": "https://example.com"}]
         for t in tr:
+            t["since_trade"] = co["price"] / t["chart_price"] - 1
             t["pct_mcap"] = t["value"] / co["market_cap"]
             t["pct_adv"] = t["value"] / co["adv"]
             t["held_value_after"] = t["held_after"] * co["price"]
             t["held_value_before"] = t["held_before"] * co["price"]
             t["pct_company_after"] = t["held_after"] / co["shares_out"]
+        if n == 0:
+            tr[0]["first_buy_label"], tr[0]["last_buy_note"] = "First buy in 4 yrs", "Last open-market buy here: Mar 2022"
+            tr[1]["first_buy_label"], tr[1]["last_buy_note"] = "New insider, first buy", "First SEC filing as an insider: Jul 2026"
+        from .brief import cluster
+        co["cluster"] = cluster(tr, today=days[-1].date())
         b = [t for t in tr if t["code"] == "P"]
         s = [t for t in tr if t["code"] == "S"]
         co.update(trades=sorted(tr, key=lambda t: t["trade_date"], reverse=True), eight_ks=eks, news=news,

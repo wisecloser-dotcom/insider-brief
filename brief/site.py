@@ -27,7 +27,7 @@ from .report import e, money, nice_date, pct, shares
 FEED = ("https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=4&company=&dateb="
         "&owner=include&start={start}&count=100&output=atom")
 SGT = timezone(timedelta(hours=8))
-CACHE_VERSION = 2   # bump to rebuild every cached company page after a logic change
+CACHE_VERSION = 3   # bump to rebuild every cached company page after a logic change
 
 
 def page_name(ticker: str) -> str:
@@ -187,13 +187,13 @@ const f=document.forms.feed;
 if(f){const KEY='ib-filters';let saved={};try{saved=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(_){}
 for(const [k,v] of Object.entries(saved)){const el=f.elements[k];if(!el)continue;if(el.type==='checkbox')el.checked=v;else el.value=v}
 const rows=[...document.querySelectorAll('tr[data-side]')],days=[...document.querySelectorAll('tbody[data-day]')];
-const apply=()=>{const side=f.side.value,min=+f.min.value,np=f.noplan.checked,role=f.role.value,q=f.q.value.trim().toLowerCase();
+const apply=()=>{const side=f.side.value,min=+f.min.value,np=f.noplan.checked,role=f.role.value,sig=f.sig.value,q=f.q.value.trim().toLowerCase();
  let n=0;rows.forEach(r=>{const ok=(side==='all'||r.dataset.side===side)&&+r.dataset.value>=min&&!(np&&r.dataset.plan==='1')
-  &&(role==='all'||r.dataset.role.includes(role))&&(!q||r.dataset.q.includes(q));r.hidden=!ok;if(ok)n++});
+  &&(role==='all'||r.dataset.role.includes(role))&&(sig==='all'||r.dataset.sig.includes(sig))&&(!q||r.dataset.q.includes(q));r.hidden=!ok;if(ok)n++});
  days.forEach(d=>{d.hidden=![...d.querySelectorAll('tr[data-side]')].some(r=>!r.hidden)});
  document.getElementById('count').textContent=n===rows.length?`${n} trades`:`${n} of ${rows.length} trades`;
  document.getElementById('none').hidden=n>0;
- try{localStorage.setItem(KEY,JSON.stringify({side:f.side.value,min:f.min.value,noplan:f.noplan.checked,role:f.role.value}))}catch(_){}};
+ try{localStorage.setItem(KEY,JSON.stringify({side:f.side.value,min:f.min.value,noplan:f.noplan.checked,role:f.role.value,sig:f.sig.value}))}catch(_){}};
 f.addEventListener('input',apply);apply();}
 const built=+document.body.dataset.built;
 async function check(){try{const r=await fetch('STATUS?'+Date.now(),{cache:'no-store'});const s=await r.json();
@@ -215,11 +215,25 @@ tbody[data-day] th.day{font-size:14px;color:var(--ink);padding-top:22px;border-b
 .back{display:inline-block;margin-bottom:4px;font-size:14px}
 section.co:first-of-type{margin-top:10px}
 .plan,.late{font-size:12px;color:var(--muted);white-space:nowrap}.late{color:var(--sell)}
+.badge{display:inline-block;font-size:12px;font-weight:700;padding:0 6px;margin-top:3px;white-space:nowrap}
+.badge.cl{background:var(--mark);color:#1B2A3A}.badge.fb{border:1px solid currentColor;color:var(--ink)}
+table.feed .up{color:var(--buy);font-weight:600}table.feed .down{color:var(--sell);font-weight:600}
 @media (max-width:720px){#count{margin-left:0;width:100%}
- .feed th:nth-child(2),.feed td:nth-child(2),.feed th:nth-child(6),.feed td:nth-child(6),
- .feed th:nth-child(7),.feed td:nth-child(7),.feed th:nth-child(8),.feed td:nth-child(8),
- .feed th:nth-child(9),.feed td:nth-child(9){display:none}}
-table.feed td:nth-child(8),table.feed td:nth-child(9){white-space:nowrap}
+ .feed th:nth-child(2),.feed td:nth-child(2),.feed th:nth-child(8),.feed td:nth-child(8),
+ .feed th:nth-child(9),.feed td:nth-child(9),.feed th:nth-child(10),.feed td:nth-child(10){display:none}}
+table.feed td:nth-child(9),table.feed td:nth-child(10){white-space:nowrap}
+@media (max-width:720px){
+ /* phones: each trade becomes two lines: who and what / amount, stake, move since */
+ table.feed,table.feed tbody{display:block}table.feed thead{display:none}
+ tbody[data-day]>tr:first-child{display:block}tbody[data-day] th.day{display:block;padding-left:0}
+ table.feed tr[data-side]{display:grid;grid-template-columns:auto 1fr auto;
+  grid-template-areas:"tk who side" "amt stake since";gap:6px 14px;padding:12px 0;border-bottom:1px solid var(--field)}
+ table.feed tr[data-side]>td{border:0;padding:0;text-align:left}
+ table.feed td:nth-child(1){grid-area:tk}table.feed td:nth-child(3){grid-area:who}
+ table.feed td:nth-child(4){grid-area:side;text-align:right}table.feed td:nth-child(5){grid-area:amt}
+ table.feed td:nth-child(6){grid-area:stake}table.feed td:nth-child(7){grid-area:since;text-align:right}
+ table.feed td:nth-child(6)::before{content:"Stake ";font-size:12px;color:var(--muted);font-weight:400}
+ table.feed td:nth-child(7)::before{content:"Since ";font-size:12px;color:var(--muted);font-weight:400}}
 """
 
 
@@ -262,7 +276,8 @@ def _role(t) -> str:
     return " ".join(r) or "other"
 
 
-def render_index(featured, cos, cfg, built_ts, window_days) -> str:
+def render_index(featured, cos, cfg, built_ts, window_days, clusters=None) -> str:
+    clusters = clusters or {}
     rows_by_day = {}
     for t in sorted(featured, key=lambda t: (t["filing_date"], t["value"]), reverse=True):
         co = cos.get(t["issuer_cik"])
@@ -275,23 +290,36 @@ def render_index(featured, cos, cfg, built_ts, window_days) -> str:
                    if src.get("pct_company_after") else "")) if src.get("held_after") else "n/a"
         q = f"{tk} {t['company']} {t['insider']} {' '.join(t.get('joint_filers') or [])}".lower()
         late = form4.days_late(t)
-        tags = ("<br><span class=plan>10b5-1 plan</span>" if t["plan_10b5_1"] else "") + (
-            f"<br><span class=late>Filed {late} days late</span>" if late and late > 10 else "")
+        cl = clusters.get(t["issuer_cik"], {}).get("n", 0) if t["code"] == "P" else 0
+        fb = src.get("first_buy_label") if t["code"] == "P" else None
+        sig = " ".join(x for x, on in (("cluster", cl >= 2), ("first", bool(fb))) if on)
+        tags = ((f"<br><span class='badge cl'>Cluster: {cl} buyers</span>" if cl >= 2 else "")
+                + (f"<br><span class='badge fb'>{e(fb)}</span>" if fb else "")
+                + ("<br><span class=plan>10b5-1 plan</span>" if t["plan_10b5_1"] else "")
+                + (f"<br><span class=late>Filed {late} days late</span>" if late and late > 10 else ""))
+        sc = src.get("stake_change")
+        stake = ("<span class=up>New</span>" if src.get("new_position") else
+                 "n/a" if sc is None else
+                 f"<span class={'up' if sc >= 0 else 'down'}>{pct(sc, signed=True)}</span>")
+        since = src.get("since_trade")
+        since_html = ("n/a" if since is None else
+                      f"<span class={'up' if since >= 0 else 'down'}>{pct(since, signed=True)}</span>")
+        mc = src.get("pct_mcap")
         others = len(t.get("joint_filers") or [])
         who = e(t["insider"]) + (f" <span class=muted>+{others} related filer{'s' if others > 1 else ''}</span>"
                                  if others else "")
         rows_by_day.setdefault(t["filing_date"], []).append(
             f"<tr class={'buy' if t['code']=='P' else 'sell'} data-side={t['code']} data-value={t['value']:.0f} "
-            f"data-plan={int(t['plan_10b5_1'])} data-role=\"{_role(t)}\" data-q=\"{e(q)}\">"
+            f"data-plan={int(t['plan_10b5_1'])} data-role=\"{_role(t)}\" data-q=\"{e(q)}\" data-sig=\"{sig}\">"
             f"<td class=tk>{link}</td><td>{e(t['company'])}</td>"
             f"<td>{who}<br><span class=muted>{e(t['position'])}</span></td>"
             f"<td><span class=side>{t['side']}</span>{tags}</td>"
-            f"<td class=n><b>{money(t['value'])}</b></td>"
-            f"<td class=n>{pct(src.get('pct_mcap')) if src.get('pct_mcap') else 'n/a'}</td>"
+            f"<td class=n><b>{money(t['value'])}</b><br><span class=muted>{pct(mc) + ' of cap' if mc else 'cap n/a'}</span></td>"
+            f"<td class=n>{stake}</td><td class=n>{since_html}</td>"
             f"<td class=n>{held}</td><td>{nice_date(t['trade_date'])}</td>"
             f"<td><a href=\"{e(t['url'])}\">Form 4</a></td></tr>")
     tbodies = "".join(
-        f"<tbody data-day=\"{d}\"><tr><th class=day colspan=9>Filed {nice_date(d)}</th></tr>{''.join(rs)}</tbody>"
+        f"<tbody data-day=\"{d}\"><tr><th class=day colspan=10>Filed {nice_date(d)}</th></tr>{''.join(rs)}</tbody>"
         for d, rs in rows_by_day.items())
     body = f"""
 <form name=feed class=filters aria-label="Filter trades" onsubmit="return false">
@@ -302,11 +330,13 @@ def render_index(featured, cos, cfg, built_ts, window_days) -> str:
   <option value=director>Directors</option><option value=tenpct>10% owners</option></select></label>
  <label>At least <select name=min><option value=0>Any amount</option><option value=100000>$100k</option>
   <option value=500000>$500k</option><option value=1000000>$1M</option><option value=5000000>$5M</option></select></label>
+ <label>Signal <select name=sig><option value=all>Any</option><option value=cluster>Cluster buys</option>
+  <option value=first>First buy in 1+ yr</option></select></label>
  <label><input type=checkbox name=noplan> Hide 10b5-1 plan trades</label>
  <span id=count aria-live=polite></span>
 </form>
 <div class=scroll><table class=feed><thead><tr><th>Ticker</th><th>Company</th><th>Insider</th><th></th>
-<th class=n>Amount</th><th class=n>Of market cap</th><th class=n>Shares held after</th><th>Traded</th><th></th></tr></thead>
+<th class=n>Amount</th><th class=n>Stake</th><th class=n>Since trade</th><th class=n>Shares held after</th><th>Traded</th><th></th></tr></thead>
 {tbodies}</table></div>
 <p id=none class=empty hidden>No trades match these filters. Clear one to see more.</p>
 {'' if featured else '<div class=empty><h2>No trades yet</h2><p>The first update is still collecting filings from EDGAR. Check back after the next run.</p></div>'}"""
@@ -336,7 +366,15 @@ def build(ed: Edgar, cfg: Config, out: Path, window_days=7, max_enrich=40,
     tmp = out.with_name(out.name + ".tmp")
     shutil.rmtree(tmp, ignore_errors=True)
     (tmp / "c").mkdir(parents=True)
-    (tmp / "index.html").write_text(render_index(featured, cos, cfg, built, window_days), encoding="utf-8")
+    clusters = {}
+    for cik in {t["issuer_cik"] for t in featured}:
+        if cik in cos and cos[cik].get("cluster"):
+            clusters[cik] = cos[cik]["cluster"]
+        else:   # not enriched yet: use the trades we've collected ourselves
+            clusters[cik] = brief.cluster(form4.dedupe_joint(
+                [dict(t) for t in st.trades if t["issuer_cik"] == cik]))
+    (tmp / "index.html").write_text(render_index(featured, cos, cfg, built, window_days, clusters),
+                                    encoding="utf-8")
     for co in cos.values():
         if co.get("ticker"):
             try:   # one odd filing must never take the whole site down
@@ -359,7 +397,8 @@ def build_sample(out: Path):
     shutil.rmtree(out, ignore_errors=True)
     (out / "c").mkdir(parents=True)
     cfg = Config()
-    page = render_index(featured, cos, cfg, built, 7).replace(
+    clusters = {k: c["cluster"] for k, c in cos.items()}
+    page = render_index(featured, cos, cfg, built, 7, clusters).replace(
         "<div class=wrap>", "<div class=wrap><p class=sample>Sample site with made-up companies and people.</p>", 1)
     (out / "index.html").write_text(page, encoding="utf-8")
     for co in cos.values():

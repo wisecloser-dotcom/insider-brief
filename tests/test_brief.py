@@ -176,3 +176,33 @@ def test_front_page_needs_a_recent_trade_date(tmp_path):
     st.trades = [base, dict(base, accession="2", insider_cik="b", trade_date=str(old))]
     got = site._featured(st, Config(), 7)
     assert [t["accession"] for t in got] == ["1"]   # filed today but traded 3 weeks ago: left out
+
+
+def test_cluster_and_first_buy_labels():
+    from datetime import date
+    from brief.brief import cluster, first_buy_label
+    t = lambda who, d, code="P", v=1e5: {"insider_cik": who, "insider": who, "trade_date": d, "code": code, "value": v}
+    c = cluster([t("a", "2026-10-06"), t("b", "2026-09-20"), t("a", "2026-10-01"),
+                 t("c", "2026-08-01"), t("d", "2026-10-05", "S")], today=date(2026, 10, 9))
+    assert c["n"] == 2 and c["insiders"] == ["a", "b"]          # c too old, d is a sale
+    assert first_buy_label({"prior_buy": "2022-03-01"}, "2026-10-06")[0] == "First buy in 4 yrs"
+    assert first_buy_label({"prior_buy": "2026-06-01"}, "2026-10-06")[0] is None
+    assert first_buy_label({"first_filing": "2026-07-01"}, "2026-10-06")[0] == "New insider, first buy"
+    assert first_buy_label({"first_filing": "2015-01-01"}, "2026-10-06")[0] == "First buy in 5+ yrs"
+    assert first_buy_label({"first_filing": "2015-01-01", "complete": False}, "2026-10-06")[0] is None
+
+
+def test_owner_buy_history_finds_last_earlier_buy():
+    import pandas as pd
+    from brief.edgar import Edgar
+    old = XML.replace(b"<transactionCode>S</transactionCode>", b"<transactionCode>P</transactionCode>") \
+             .replace(b"2026-10-06", b"2023-02-01").replace(b"2026-10-07", b"2023-02-02")
+    other = XML.replace(b"0000320193", b"0000999999")       # a different company: ignored
+    ed = Edgar.__new__(Edgar)
+    ed.recent_filings = lambda cik: pd.DataFrame({
+        "accessionNumber": ["n", "x", "o", "first"], "form": ["4", "4", "4", "3"],
+        "filingDate": pd.to_datetime(["2026-10-08", "2025-01-01", "2023-02-03", "2019-05-01"]),
+        "primaryDocument": "", "items": ""})
+    ed.filing = lambda cik, acc: form4.parse({"n": XML, "x": other, "o": old}.get(acc, XML))
+    h = ed.owner_buy_history("1214156", "320193", "2026-10-06", "2026-10-08")
+    assert h["prior_buy"] == "2023-02-02" and h["first_filing"] == "2019-05-01"

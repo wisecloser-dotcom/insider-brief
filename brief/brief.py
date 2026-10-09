@@ -36,6 +36,46 @@ def insider_wealth(ed: Edgar, cfg: Config, t: dict, price_now: float | None, cac
             "trade_vs_holdings": (t["value"] / before) if before and before > 0 else None}
 
 
+def cluster(trades: list[dict], days: int = 30, today: date | None = None) -> dict:
+    """Distinct insiders who bought on the open market in the last `days` days."""
+    cut = str((today or date.today()) - timedelta(days=days))
+    buys = [t for t in trades if t["code"] == "P" and (t.get("trade_date") or "") >= cut]
+    names = list(dict.fromkeys(t["insider"] for t in buys))
+    return {"n": len({t["insider_cik"] for t in buys}), "insiders": names,
+            "value": float(sum(t["value"] for t in buys))}
+
+
+def first_buy_label(h: dict, trade_date: str, years: int = 5) -> tuple[str | None, str | None]:
+    """(badge for the front page, note for the company page)."""
+    td = date.fromisoformat(trade_date[:10])
+    if h.get("prior_buy"):
+        prior = date.fromisoformat(h["prior_buy"])
+        gap = (td - prior).days / 365.25
+        note = f"Last open-market buy here: {prior.day} {prior:%b %Y}"
+        if gap >= 1:
+            n = int(gap)
+            return f"First buy in {n} yr{'s' if n > 1 else ''}", note
+        return None, note
+    first = h.get("first_filing")
+    if first:
+        since = (td - date.fromisoformat(first)).days / 365.25
+        if since < 1:
+            return "New insider, first buy", f"First SEC filing as an insider: {nice(first)}"
+        if not h.get("complete", True):
+            return None, "No earlier buy found in their recent filings"
+        n = min(int(since), years)
+        plus = "+" if since >= years else ""
+        return (f"First buy in {n}{plus} yr{'s' if n > 1 else ''}",
+                f"No open-market buy here in their filings since {nice(first)}"
+                if since < years else f"No open-market buy here in {years}+ years of filings")
+    return None, None
+
+
+def nice(d: str) -> str:
+    x = date.fromisoformat(d[:10])
+    return f"{x:%b %Y}"
+
+
 def company(ed: Edgar, cfg: Config, cik, ticker: str, name: str,
             headline: list[dict], related: list[dict] | None = None, log=print) -> dict:
     since = date.today() - timedelta(days=cfg.lookback_days)
@@ -75,9 +115,13 @@ def company(ed: Edgar, cfg: Config, cik, ticker: str, name: str,
             t["pct_company_after"] = None
         t["days_late"] = form4.days_late(t)
         t["chart_price"] = market.to_chart_scale(px, t["trade_date"], t["price"])
+        t["since_trade"] = (s["price"] / t["chart_price"] - 1) if (s["price"] and t["chart_price"]) else None
     for t in related:
         if t["headline"]:
             t["wealth"] = insider_wealth(ed, cfg, t, s["price"], price_cache)
+            if t["code"] == "P" and t.get("insider_cik") and t.get("trade_date"):
+                h = ed.owner_buy_history(t["insider_cik"], cik, t["trade_date"], t["filing_date"])
+                t["first_buy_label"], t["last_buy_note"] = first_buy_label(h, t["trade_date"])
 
     df = pd.DataFrame(related, columns=["code", "insider_cik", "value", "plan_10b5_1"]
                       if not related else None)
@@ -102,7 +146,7 @@ def company(ed: Edgar, cfg: Config, cik, ticker: str, name: str,
         "price": s["price"], "chg_6m": s["chg_6m"], "adv": s["adv"],
         "market_cap": mcap, "shares_out": shares_out,
         "trades": sorted(related, key=lambda t: (t["trade_date"] or "", t["filing_date"]), reverse=True),
-        "totals": totals, "chart": chart,
+        "totals": totals, "chart": chart, "cluster": cluster(related),
         "eight_ks": ed.eight_ks(cik, since),
         "news": news.headlines(sub.get("name") or name, ticker, cfg.lookback_days, cfg.news_items),
         "edgar_url": f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={int(cik)}&type=4&owner=only",

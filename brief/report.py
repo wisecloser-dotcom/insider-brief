@@ -121,6 +121,10 @@ def trade_block(t: dict, co: dict) -> str:
         f"<td class=n>{money(h['value']) if h['value'] else 'no price'}</td><td>{nice_date(h['as_of'])}</td></tr>"
         for h in w.get("holdings", []))
     flags = []
+    if t.get("first_buy_label"):
+        flags.append(t["first_buy_label"])
+    if t.get("last_buy_note"):
+        flags.append(t["last_buy_note"])
     if t["plan_10b5_1"]:
         flags.append("Pre-arranged 10b5-1 plan trade")
     if (t.get("days_late") or 0) > 10:
@@ -134,6 +138,9 @@ def trade_block(t: dict, co: dict) -> str:
     fields = [
         ("Amount", f"<b class=big>{money(t['value'])}</b><br>{shares(t['shares'])} shares at {money(t['price'])}"),
         ("Traded / filed", f"{nice_date(t['trade_date'])}<br><span class=muted>filed {nice_date(t['filing_date'])}</span>"),
+        ("Price since the trade", (f"<b class='big {'up' if t['since_trade'] >= 0 else 'down'}'>{pct(t['since_trade'], signed=True)}</b>"
+                                   f"<br><span class=muted>{money(t['chart_price'])} then, {money(co['price'])} now</span>")
+                                  if t.get("since_trade") is not None else "n/a"),
         ("Share of company size", f"{pct(t['pct_mcap'])} of market cap<br><span class=muted>{adv_text} a typical day&rsquo;s trading</span>"),
         ("Holding in " + e(co["ticker"]), f"{held_line}<br><span class=muted>Stake {stake}"
                                           f"{'; ' + pct(t['pct_company_after']) + ' of the company' if t['pct_company_after'] else ''}</span>"),
@@ -181,6 +188,15 @@ def news_block(co: dict) -> str:
             f"<div><h4>Headlines</h4><ul>{ns}</ul></div></div>")
 
 
+def cluster_note(co: dict) -> str:
+    c = co.get("cluster") or {}
+    if c.get("n", 0) < 2:
+        return ""
+    names = ", ".join(e(n) for n in c["insiders"][:6]) + (" and others" if len(c["insiders"]) > 6 else "")
+    return (f"<p class=callout><b>Cluster buy:</b> {c['n']} insiders bought {money(c['value'])} "
+            f"in the last 30 days ({names}).</p>")
+
+
 def company_section(co: dict, mode: str) -> str:
     head = [t for t in co["trades"] if t["headline"]]
     facts = [("Price", money(co["price"])), ("6-month change", pct(co["chg_6m"], signed=True)),
@@ -193,6 +209,7 @@ def company_section(co: dict, mode: str) -> str:
   <p class=muted>{e(co['industry'])}{' / ' + e(co['exchange']) if co['exchange'] else ''} /
   <a href="{e(co['edgar_url'])}">All insider filings on EDGAR</a></p></div>
   <dl class=facts>{''.join(f'<div><dt>{k}</dt><dd>{v}</dd></div>' for k, v in facts)}</dl></div>
+ {cluster_note(co)}
  {chart_svg(co)}
  <h4>{title}</h4>{''.join(trade_block(t, co) for t in head)}
  <h4>Everyone trading {e(co['ticker'])} in the last 90 days</h4>{related_table(co)}
@@ -299,7 +316,9 @@ article h3{margin:0;font-size:18px}article header p{margin:0;color:var(--muted)}
 article header a{margin-left:auto;font-size:14px}
 article dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));border-top:1px solid var(--field)}
 article dl div{padding:10px 14px;border-right:1px solid var(--field)}article dd{font-weight:500}
-.big{font-size:20px;font-weight:800}
+.big{font-size:20px;font-weight:800}.up{color:var(--buy)}.down{color:var(--sell)}
+.callout{margin:16px 0 0;padding:10px 14px;background:color-mix(in srgb,var(--mark) 45%,transparent);
+border-left:5px solid var(--mark)}
 .flags{margin:0;padding:8px 14px;border-top:1px solid var(--field);font-size:13px;color:var(--muted)}
 details{border-top:1px solid var(--field);padding:8px 14px;font-size:14px}
 summary{cursor:pointer;color:var(--muted)}table.hold{margin:8px 0}

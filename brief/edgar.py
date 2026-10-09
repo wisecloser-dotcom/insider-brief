@@ -147,6 +147,40 @@ class Edgar:
                                        "as_of": str(r.filingDate.date())}
         return list(latest.values())
 
+    def owner_buy_history(self, owner_cik, issuer_cik, trade_date: str, filing_date: str,
+                          years: int = 5, max_filings: int = 150) -> dict:
+        """When did this person last buy this company on the open market before this trade?
+        Reads their own Form 4/5 filings, newest first (cached, so cheap after the first time)."""
+        out = {"prior_buy": None, "first_filing": None, "complete": True}
+        try:
+            df = self.recent_filings(owner_cik)
+        except Exception:
+            out["complete"] = False
+            return out
+        if df.empty:
+            return out
+        out["first_filing"] = str(df["filingDate"].min().date())
+        lo = pd.Timestamp(trade_date) - pd.DateOffset(years=years)
+        df = df[df["form"].isin(["4", "4/A", "5", "5/A"]) & (df["filingDate"] >= lo)
+                & (df["filingDate"] <= pd.Timestamp(filing_date))]
+        if len(df) > max_filings:
+            out["complete"] = False
+        for r in df.head(max_filings).itertuples():
+            try:
+                f = self.filing(owner_cik, r.accessionNumber)
+            except Exception:
+                continue
+            if not f or f["issuer_cik"] != str(int(issuer_cik)):
+                continue
+            for row in f["rows"]:
+                d = row.get("date")
+                if row["kind"] == "trade" and row["code"] == "P" and d and d < trade_date:
+                    if out["prior_buy"] is None or d > out["prior_buy"]:
+                        out["prior_buy"] = d
+            if out["prior_buy"]:
+                break   # newest first: the first hit is the most recent earlier buy
+        return out
+
     def eight_ks(self, cik, since: date) -> list[dict]:
         df = self.recent_filings(cik)
         df = df[df["form"].isin(["8-K", "8-K/A"]) & (df["filingDate"] >= pd.Timestamp(since))]
