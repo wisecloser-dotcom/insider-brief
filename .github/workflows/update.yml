@@ -1,0 +1,64 @@
+# Rebuilds the website from SEC EDGAR every 30 minutes and publishes it on GitHub Pages.
+name: Update site
+
+on:
+  schedule:
+    - cron: "7,37 * * * *"     # twice an hour (GitHub may start scheduled runs a few minutes late)
+  workflow_dispatch: {}        # lets you press "Run workflow" by hand
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: update-site
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      # filings never change once filed, so keep the download cache between runs
+      - uses: actions/cache/restore@v4
+        with:
+          path: data
+          key: data-${{ github.run_id }}
+          restore-keys: data-
+
+      - name: Read EDGAR and build the site
+        run: python -m brief site --sec-agent "${{ secrets.SEC_USER_AGENT }}" --out site
+        env:
+          TZ: Asia/Singapore
+
+      - name: Drop cached files older than 120 days
+        if: always()
+        run: find data/cache -type f -mtime +120 -delete 2>/dev/null || true
+
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: data
+          key: data-${{ github.run_id }}
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

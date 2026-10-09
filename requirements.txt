@@ -1,0 +1,6 @@
+requests
+lxml
+pandas>=2.0
+numpy
+yfinance
+pytest
