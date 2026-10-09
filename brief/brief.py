@@ -80,7 +80,7 @@ def company(ed: Edgar, cfg: Config, cik, ticker: str, name: str,
             headline: list[dict], related: list[dict] | None = None, log=print) -> dict:
     since = date.today() - timedelta(days=cfg.lookback_days)
     sub = ed.submissions(cik)
-    px = market.history(ticker, months=cfg.chart_months + 1) if ticker else None
+    px = market.history(ticker, months=61) if ticker else None   # 5 years for the candle chart
     s = market.summary(px)
     shares_out = ed.shares_outstanding(cik)
     mcap = shares_out * s["price"] if (shares_out and s["price"]) else None
@@ -146,7 +146,7 @@ def company(ed: Edgar, cfg: Config, cik, ticker: str, name: str,
         "price": s["price"], "chg_6m": s["chg_6m"], "adv": s["adv"],
         "market_cap": mcap, "shares_out": shares_out,
         "trades": sorted(related, key=lambda t: (t["trade_date"] or "", t["filing_date"]), reverse=True),
-        "totals": totals, "chart": chart, "cluster": cluster(related),
+        "totals": totals, "chart": chart, "cluster": cluster(related), "ohlc": market.ohlc(px),
         "eight_ks": ed.eight_ks(cik, since),
         "news": news.headlines(sub.get("name") or name, ticker, cfg.lookback_days, cfg.news_items),
         "edgar_url": f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={int(cik)}&type=4&owner=only",

@@ -206,3 +206,18 @@ def test_owner_buy_history_finds_last_earlier_buy():
     ed.filing = lambda cik, acc: form4.parse({"n": XML, "x": other, "o": old}.get(acc, XML))
     h = ed.owner_buy_history("1214156", "320193", "2026-10-06", "2026-10-08")
     assert h["prior_buy"] == "2023-02-02" and h["first_filing"] == "2019-05-01"
+
+
+def test_spark_and_chart_data():
+    from brief import site, sample
+    svg = site.spark_svg([10.0, 10.5, 11.0], 10.0)
+    assert 'class="spark up"' in svg and "<polyline" in svg
+    assert 'class="spark down"' in site.spark_svg([9.5, 9.0], 10.0)
+    assert site.spark_svg([], 10.0) == ""
+    co = sample.companies()[0]
+    co["trades"][0]["insider"] = "Evil </script><b>x"      # data must not break out of the script tag
+    block = site.tv_block(co)
+    assert "</script><b>" not in block.split("id=pxdata>")[1].split("</script>")[0] + "</script><b>"[:0]
+    assert block.count("</script>") == 1
+    page = site.render_company(co, 0)
+    assert "lightweight-charts.js" in page and "id=svgchart" in page

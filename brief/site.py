@@ -19,7 +19,7 @@ from pathlib import Path
 
 from lxml import etree
 
-from . import brief, form4, report
+from . import brief, form4, market, report
 from .config import Config
 from .edgar import Edgar, last_weekday
 from .report import e, money, nice_date, pct, shares
@@ -27,7 +27,7 @@ from .report import e, money, nice_date, pct, shares
 FEED = ("https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=4&company=&dateb="
         "&owner=include&start={start}&count=100&output=atom")
 SGT = timezone(timedelta(hours=8))
-CACHE_VERSION = 3   # bump to rebuild every cached company page after a logic change
+CACHE_VERSION = 4   # bump to rebuild every cached company page after a logic change
 
 
 def page_name(ticker: str) -> str:
@@ -194,7 +194,10 @@ const apply=()=>{const side=f.side.value,min=+f.min.value,np=f.noplan.checked,ro
  document.getElementById('count').textContent=n===rows.length?`${n} trades`:`${n} of ${rows.length} trades`;
  document.getElementById('none').hidden=n>0;
  try{localStorage.setItem(KEY,JSON.stringify({side:f.side.value,min:f.min.value,noplan:f.noplan.checked,role:f.role.value,sig:f.sig.value}))}catch(_){}};
-f.addEventListener('input',apply);apply();}
+f.addEventListener('input',apply);apply();
+document.querySelectorAll('button.show').forEach(b=>b.addEventListener('click',()=>{
+ const want=JSON.parse(b.dataset.f);['side','role','sig','min'].forEach(k=>{f.elements[k].value=want[k]||(k==='min'?'0':'all')});
+ f.q.value='';apply();document.querySelector('table.feed').scrollIntoView({behavior:'smooth',block:'start'})}));}
 const built=+document.body.dataset.built;
 async function check(){try{const r=await fetch('STATUS?'+Date.now(),{cache:'no-store'});const s=await r.json();
  if(s.built>built)document.getElementById('fresh').hidden=false}catch(_){}}
@@ -211,14 +214,35 @@ padding:4px 8px;min-width:220px}
 #count{margin-left:auto;color:var(--muted)}
 table.feed td{vertical-align:middle}
 table.feed .tk a{font-weight:800;font-size:16px}
+table.feed td:nth-child(3){min-width:190px}table.feed td:nth-child(2){min-width:130px}
 tbody[data-day] th.day{font-size:14px;color:var(--ink);padding-top:22px;border-bottom:2px solid var(--ink)}
 .back{display:inline-block;margin-bottom:4px;font-size:14px}
 section.co:first-of-type{margin-top:10px}
 .plan,.late{font-size:12px;color:var(--muted);white-space:nowrap}.late{color:var(--sell)}
+.strip{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--rule);background:var(--sheet);margin:18px 0 4px}
+.sc{padding:12px 14px;border-left:1px solid var(--rule);display:flex;flex-direction:column;gap:2px}
+.sc:first-child{border-left:0}.sc h3{margin:0;font-size:12px;font-weight:600;color:var(--muted)}
+.sc .sv{margin:0;font-size:22px;font-weight:800;line-height:1.2}.sc .sl{margin:2px 0 0;font-size:13px;line-height:1.6}
+.sc .sl a{font-weight:700}.show{margin-top:auto;align-self:flex-start;font:inherit;font-size:13px;color:var(--ink);
+background:none;border:1px solid var(--rule);padding:3px 10px;cursor:pointer}.show:hover{border-color:var(--ink)}
+.sp{display:inline-flex;align-items:center;gap:8px;justify-content:flex-end}
+.spark polyline{fill:none;stroke-width:1.6;stroke-linejoin:round}.spark .base{stroke:var(--muted);stroke-dasharray:2 2;stroke-width:1}
+.spark.up polyline{stroke:var(--buy)}.spark.down polyline{stroke:var(--sell)}.spark.up circle{fill:var(--buy)}.spark.down circle{fill:var(--sell)}
+.tvbox{margin-top:18px;border:1px solid var(--rule);background:var(--sheet)}
+.tvbar{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:flex-start;padding:10px 12px;border-bottom:1px solid var(--field)}
+.ranges{display:flex;border:1px solid var(--rule)}
+.ranges button{font:inherit;font-size:13px;font-weight:600;color:var(--muted);background:none;border:0;
+border-left:1px solid var(--rule);padding:4px 11px;cursor:pointer}.ranges button:first-child{border-left:0}
+.ranges button[aria-pressed=true]{background:var(--ink);color:var(--sheet)}
+.tvlegend{font-size:13px;line-height:1.5;font-variant-numeric:tabular-nums;min-height:20px}
+.tvlegend .up{color:var(--buy);font-weight:600}.tvlegend .down{color:var(--sell);font-weight:600}
+.tv{height:440px}
+@media (max-width:720px){.tv{height:340px}}
 .badge{display:inline-block;font-size:12px;font-weight:700;padding:0 6px;margin-top:3px;white-space:nowrap}
 .badge.cl{background:var(--mark);color:#1B2A3A}.badge.fb{border:1px solid currentColor;color:var(--ink)}
 table.feed .up{color:var(--buy);font-weight:600}table.feed .down{color:var(--sell);font-weight:600}
 @media (max-width:720px){#count{margin-left:0;width:100%}
+ .strip{grid-template-columns:1fr 1fr}.sc:nth-child(3){border-left:0}.sc:nth-child(n+3){border-top:1px solid var(--rule)}
  .feed th:nth-child(2),.feed td:nth-child(2),.feed th:nth-child(8),.feed td:nth-child(8),
  .feed th:nth-child(9),.feed td:nth-child(9),.feed th:nth-child(10),.feed td:nth-child(10){display:none}}
 table.feed td:nth-child(9),table.feed td:nth-child(10){white-space:nowrap}
@@ -260,7 +284,7 @@ def shell(title, subtitle, facts, body, built_ts, status_url, script=True, note=
 company plus other public companies they file for), valued at today&rsquo;s prices. It is a floor,
 not net worth: cash, property, private companies, options and unvested awards are not included.</p>
 <p>Sources: SEC EDGAR (Form 4, 8-K, shares outstanding), Yahoo Finance (prices), Google News
-(headlines). Open-market buys and sells only. Information only, not investment advice.</p></footer>
+(headlines). Charts by TradingView Lightweight Charts. Open-market buys and sells only. Information only, not investment advice.</p></footer>
 </div><script>{JS_SITE.replace('STATUS', status_url) if script else ''}</script></body></html>"""
 
 
@@ -276,15 +300,81 @@ def _role(t) -> str:
     return " ".join(r) or "other"
 
 
-def render_index(featured, cos, cfg, built_ts, window_days, clusters=None) -> str:
+def spark_svg(points: list[float], base: float) -> str:
+    """Tiny line of the price since the trade; the dashed line is the insider's price."""
+    if not points or not base:
+        return ""
+    vals = [base] + points
+    lo, hi = min(vals), max(vals)
+    span = (hi - lo) or base * 0.01
+    W, H, P = 92, 28, 3
+    X = lambda i: i * W / (len(vals) - 1) if len(vals) > 1 else W
+    Y = lambda v: P + (hi - v) * (H - 2 * P) / span
+    pts = " ".join(f"{X(i):.1f},{Y(v):.1f}" for i, v in enumerate(vals))
+    cls = "up" if points[-1] >= base else "down"
+    return (f'<svg class="spark {cls}" viewBox="0 0 {W} {H}" width={W} height={H} aria-hidden=true>'
+            f'<line x1=0 x2={W} y1="{Y(base):.1f}" y2="{Y(base):.1f}" class=base />'
+            f'<polyline points="{pts}" /><circle cx="{X(len(vals)-1):.1f}" cy="{Y(vals[-1]):.1f}" r=2.2 /></svg>')
+
+
+def since_series(t: dict, src: dict, co: dict | None, intraday: dict) -> tuple[list[float], float | None]:
+    """Prices from the trade date to now (hourly if we have them, else daily closes)."""
+    base = src.get("chart_price") or t.get("price")
+    day = (t.get("trade_date") or "")[:10]
+    bars = intraday.get(t["ticker"]) or []
+    pts = [c for ts, c in bars if ts[:10] >= day]
+    if len(pts) < 2 and co and co.get("chart"):
+        ch = co["chart"]
+        pts = [c for d, c in zip(ch["dates"], ch["close"]) if d >= day]
+    return pts, base
+
+
+def strip_html(info: list[dict]) -> str:
+    buys = [x for x in info if x["t"]["code"] == "P"]
+    if not buys:
+        return ""
+    link = lambda x: (f'<a href="{x["href"]}">{e(x["t"]["ticker"])}</a>' if x["href"] else e(x["t"]["ticker"]))
+    def tickers(rows, n=4):
+        seen, out = set(), []
+        for x in sorted(rows, key=lambda x: -x["t"]["value"]):
+            if x["t"]["ticker"] not in seen:
+                seen.add(x["t"]["ticker"])
+                out.append(f'{link(x)} <span class=muted>{money(x["t"]["value"])}</span>')
+        more = len(seen) - n
+        return " ".join(out[:n]) + (f' <span class=muted>+{more} more</span>' if more > 0 else ""), len(seen)
+    big = max(buys, key=lambda x: x["t"]["value"])
+    cl, n_cl = tickers([x for x in buys if x["cl"] >= 2])
+    cs, n_cs = tickers([x for x in buys if "csuite" in x["role"]])
+    fb, n_fb = tickers([x for x in buys if x["fb"]])
+    co_word = lambda n: f"{n} compan{'y' if n == 1 else 'ies'}"
+    cards = [
+        ("Biggest buy", money(big["t"]["value"]),
+         f'{link(big)} <span class=muted>{e(big["t"]["position"])}'
+         + (f', {pct(big["src"]["pct_mcap"])} of cap' if big["src"].get("pct_mcap") else "") + "</span>", None),
+        ("Cluster buys", co_word(n_cl), cl or "<span class=muted>None this week</span>",
+         '{"side":"P","sig":"cluster"}' if n_cl else None),
+        ("CEO and CFO buys", co_word(n_cs), cs or "<span class=muted>None this week</span>",
+         '{"side":"P","role":"csuite"}' if n_cs else None),
+        ("First buys in 1+ yr", co_word(n_fb), fb or "<span class=muted>None this week</span>",
+         '{"side":"P","sig":"first"}' if n_fb else None),
+    ]
+    return ("<section class=strip aria-label=\"This week's buy signals\">" + "".join(
+        f"<div class=sc><h3>{h}</h3><p class=sv>{v}</p><p class=sl>{l}</p>"
+        + (f"<button type=button class=show data-f='{f}'>Show in the list</button>" if f else "") + "</div>"
+        for h, v, l, f in cards) + "</section>")
+
+
+def render_index(featured, cos, cfg, built_ts, window_days, clusters=None, intraday=None) -> str:
     clusters = clusters or {}
-    rows_by_day = {}
+    intraday = intraday or {}
+    rows_by_day, info = {}, []
     for t in sorted(featured, key=lambda t: (t["filing_date"], t["value"]), reverse=True):
         co = cos.get(t["issuer_cik"])
         tk = t["ticker"]
         enriched = next((x for x in co["trades"] if _key(x) == _key(t)), None) if co else None
         src = enriched or t
-        link = f'<a href="c/{page_name(tk)}.html">{e(tk)}</a>' if co else e(tk)
+        link = (f'<a href="c/{page_name(tk)}.html#t={(t.get("trade_date") or "")[:10]}">{e(tk)}</a>'
+                if co else e(tk))
         held = (f"{shares(src['held_after'])}"
                 + (f"<br><span class=muted>{pct(src.get('pct_company_after'))} of co.</span>"
                    if src.get("pct_company_after") else "")) if src.get("held_after") else "n/a"
@@ -301,9 +391,13 @@ def render_index(featured, cos, cfg, built_ts, window_days, clusters=None) -> st
         stake = ("<span class=up>New</span>" if src.get("new_position") else
                  "n/a" if sc is None else
                  f"<span class={'up' if sc >= 0 else 'down'}>{pct(sc, signed=True)}</span>")
-        since = src.get("since_trade")
+        pts, base = since_series(t, src, co, intraday)
+        since = (pts[-1] / base - 1) if (pts and base) else src.get("since_trade")
         since_html = ("n/a" if since is None else
-                      f"<span class={'up' if since >= 0 else 'down'}>{pct(since, signed=True)}</span>")
+                      f"<span class=sp>{spark_svg(pts, base)}"
+                      f"<span class={'up' if since >= 0 else 'down'}>{pct(since, signed=True)}</span></span>")
+        href = f"c/{page_name(tk)}.html#t={(t.get('trade_date') or '')[:10]}" if co else None
+        info.append({"t": t, "src": src, "cl": cl, "fb": fb, "role": _role(t), "href": href})
         mc = src.get("pct_mcap")
         others = len(t.get("joint_filers") or [])
         who = e(t["insider"]) + (f" <span class=muted>+{others} related filer{'s' if others > 1 else ''}</span>"
@@ -321,7 +415,7 @@ def render_index(featured, cos, cfg, built_ts, window_days, clusters=None) -> st
     tbodies = "".join(
         f"<tbody data-day=\"{d}\"><tr><th class=day colspan=10>Filed {nice_date(d)}</th></tr>{''.join(rs)}</tbody>"
         for d, rs in rows_by_day.items())
-    body = f"""
+    body = strip_html(info) + f"""
 <form name=feed class=filters aria-label="Filter trades" onsubmit="return false">
  <label><input type=search name=q placeholder="Ticker, company or person" aria-label="Search"></label>
  <label>Show <select name=side><option value=all>Buys and sells</option><option value=P>Buys only</option>
@@ -348,9 +442,90 @@ def render_index(featured, cos, cfg, built_ts, window_days, clusters=None) -> st
     return shell("Insider trades", sub, facts, body, built_ts, "status.json", note=note)
 
 
+TV_JS = r"""
+(function(){
+const box=document.getElementById('tvbox'),el=document.getElementById('tv');
+if(!box||!window.LightweightCharts)return;
+const D=JSON.parse(document.getElementById('pxdata').textContent);
+if(!D.t||D.t.length<5)return;
+box.hidden=false;const fb=document.getElementById('svgchart');if(fb)fb.hidden=true;   // needs a width before drawing
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const L=LightweightCharts;
+const theme=()=>({layout:{background:{type:'solid',color:css('--sheet')},textColor:css('--muted'),
+  fontFamily:'"Public Sans",system-ui,sans-serif'},grid:{vertLines:{color:css('--field')},horzLines:{color:css('--field')}},
+  rightPriceScale:{borderColor:css('--rule')},timeScale:{borderColor:css('--rule')}});
+const chart=L.createChart(el,{...theme(),autoSize:true,crosshair:{mode:0},
+  timeScale:{borderColor:css('--rule'),rightOffset:4},localization:{locale:'en-US',priceFormatter:p=>'$'+p.toFixed(p<10?3:2)}});
+const candles=chart.addSeries(L.CandlestickSeries,{upColor:css('--buy'),downColor:css('--sell'),
+  borderVisible:false,wickUpColor:css('--buy'),wickDownColor:css('--sell')});
+candles.setData(D.t.map((t,i)=>({time:t,open:D.o[i],high:D.h[i],low:D.l[i],close:D.c[i]})));
+candles.priceScale().applyOptions({scaleMargins:{top:0.08,bottom:0.24}});
+const vol=chart.addSeries(L.HistogramSeries,{priceFormat:{type:'volume'},priceScaleId:'',lastValueVisible:false,priceLineVisible:false});
+vol.priceScale().applyOptions({scaleMargins:{top:0.8,bottom:0}});
+vol.setData(D.t.map((t,i)=>({time:t,value:D.v[i],color:(D.c[i]>=D.o[i]?css('--buy'):css('--sell'))+'55'})));
+// snap each trade to the first trading day on or after its date
+const snap=d=>{for(const t of D.t){if(t>=d)return t}return D.t[D.t.length-1]};
+const byDay={};
+D.trades.forEach(x=>{const day=snap(x.d);(byDay[day]=byDay[day]||[]).push(x)});
+const marks=D.trades.filter(x=>x.d>=D.t[0]).map(x=>({time:snap(x.d),position:x.s==='P'?'belowBar':'aboveBar',
+  shape:x.s==='P'?'arrowUp':'arrowDown',color:x.s==='P'?css('--buy'):css('--sell'),size:x.h?1.1:0.8,
+  text:x.h?(x.s==='P'?'Buy ':'Sell ')+x.v:''})).sort((a,b)=>a.time<b.time?-1:a.time>b.time?1:0);
+L.createSeriesMarkers(candles,marks);
+// the trade you clicked: dashed line at the insider's price, and zoom to it
+const focus=(location.hash.match(/t=(\d{4}-\d{2}-\d{2})/)||[])[1];
+const ft=focus&&D.trades.find(x=>x.d===focus&&x.h)||D.trades.find(x=>x.h);
+if(ft)candles.createPriceLine({price:ft.p,color:css('--ink'),lineWidth:1,lineStyle:2,axisLabelVisible:true,
+  title:(ft.s==='P'?'Insider buy ':'Insider sell ')+'$'+ft.p.toFixed(2)});
+const last=D.t[D.t.length-1];
+const back=(d,days)=>{const x=new Date(d+'T00:00:00Z');x.setUTCDate(x.getUTCDate()-days);return x.toISOString().slice(0,10)};
+const setRange=days=>{if(!days){chart.timeScale().fitContent();return}
+  const from=back(last,days);chart.timeScale().setVisibleRange({from:from<D.t[0]?D.t[0]:from,to:last})};
+const btns=[...box.querySelectorAll('[data-r]')];
+const pick=days=>{btns.forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.r===days)));setRange(days)};
+btns.forEach(b=>b.addEventListener('click',()=>pick(+b.dataset.r)));
+requestAnimationFrame(()=>{if(focus){const from=back(focus,30);btns.forEach(b=>b.setAttribute('aria-pressed','false'));
+  chart.timeScale().setVisibleRange({from:from<D.t[0]?D.t[0]:from,to:last})}else pick(182)});
+// legend: the bar under the cursor, plus any insider trades that day
+const lg=document.getElementById('tvlegend');
+const fmt=v=>'$'+v.toFixed(v<10?3:2);
+const show=i=>{const t=D.t[i],chg=i?D.c[i]/D.c[i-1]-1:0;
+  let h='<b>'+t+'</b> O '+fmt(D.o[i])+' H '+fmt(D.h[i])+' L '+fmt(D.l[i])+' C '+fmt(D.c[i])+
+   ' <span class='+(chg>=0?'up':'down')+'>'+(chg>=0?'+':'')+(chg*100).toFixed(2)+'%</span>';
+  (byDay[t]||[]).forEach(x=>{h+='<br><span class='+(x.s==='P'?'up':'down')+'>'+(x.s==='P'?'Buy':'Sell')+
+   '</span> '+x.n+' ('+x.r+') '+x.v+' at '+fmt(x.p)});lg.innerHTML=h};
+show(D.t.length-1);
+chart.subscribeCrosshairMove(p=>{if(!p.time){show(D.t.length-1);return}const i=D.t.indexOf(p.time);if(i>=0)show(i)});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>chart.applyOptions(theme()));
+})();
+"""
+
+
+def tv_block(co: dict) -> str:
+    o = co.get("ohlc")
+    if not o or len(o.get("t", [])) < 5:
+        return ""
+    trades = [{"d": (t.get("trade_date") or "")[:10], "s": t["code"], "p": round(t.get("chart_price") or t["price"], 4),
+               "v": money(t["value"]), "n": t["insider"], "r": t["position"], "h": bool(t.get("headline"))}
+              for t in co["trades"] if t.get("trade_date")]
+    data = json.dumps({**o, "trades": trades}).replace("</", "<\\/")
+    ranges = "".join(f'<button type=button data-r={d}>{l}</button>'
+                     for l, d in (("1M", 30), ("3M", 91), ("6M", 182), ("1Y", 365), ("5Y", 0)))
+    return (f'<div id=tvbox class=tvbox hidden><div class=tvbar><div class=ranges role=group '
+            f'aria-label="Chart range">{ranges}</div><div id=tvlegend class=tvlegend aria-live=off></div></div>'
+            f'<div id=tv class=tv></div></div>'
+            f'<script type=application/json id=pxdata>{data}</script>')
+
+
 def render_company(co, built_ts) -> str:
-    body = (f'<a class=back href="../index.html">&larr; All insider trades</a>'
-            + report.company_section(co, "site").replace("Trades in this brief", "Traded in the last 7 days"))
+    section = report.company_section(co, "site")
+    svg = report.chart_svg(co)
+    tv = tv_block(co)
+    if tv and svg in section:   # interactive chart, with the simple chart as a no-script fallback
+        section = section.replace(svg, tv + f"<div id=svgchart>{svg}</div>", 1)
+    section = section.replace("Trades in this brief", "Traded in the last 7 days")
+    body = (f'<a class=back href="../index.html">&larr; All insider trades</a>' + section
+            + ('<script src="../assets/lightweight-charts.js"></script>'
+               f"<script>{TV_JS}</script>" if tv else ""))
     return shell(f"{co['ticker']} insider trades: {co['name']}", "", [], body, built_ts,
                  "../status.json", compact=True)
 
@@ -366,6 +541,16 @@ def build(ed: Edgar, cfg: Config, out: Path, window_days=7, max_enrich=40,
     tmp = out.with_name(out.name + ".tmp")
     shutil.rmtree(tmp, ignore_errors=True)
     (tmp / "c").mkdir(parents=True)
+    (tmp / "assets").mkdir()
+    static = Path(__file__).parent / "static"
+    for f in static.iterdir():
+        shutil.copy(f, tmp / "assets" / f.name)
+    try:
+        intraday = market.intraday_batch([t["ticker"] for t in featured])
+    except Exception as err:
+        warn(f"hourly prices unavailable this run: {err!r}")
+        intraday = {}
+    log(f"  hourly prices for {len(intraday)} tickers")
     clusters = {}
     for cik in {t["issuer_cik"] for t in featured}:
         if cik in cos and cos[cik].get("cluster"):
@@ -373,7 +558,7 @@ def build(ed: Edgar, cfg: Config, out: Path, window_days=7, max_enrich=40,
         else:   # not enriched yet: use the trades we've collected ourselves
             clusters[cik] = brief.cluster(form4.dedupe_joint(
                 [dict(t) for t in st.trades if t["issuer_cik"] == cik]))
-    (tmp / "index.html").write_text(render_index(featured, cos, cfg, built, window_days, clusters),
+    (tmp / "index.html").write_text(render_index(featured, cos, cfg, built, window_days, clusters, intraday),
                                     encoding="utf-8")
     for co in cos.values():
         if co.get("ticker"):
@@ -398,7 +583,11 @@ def build_sample(out: Path):
     (out / "c").mkdir(parents=True)
     cfg = Config()
     clusters = {k: c["cluster"] for k, c in cos.items()}
-    page = render_index(featured, cos, cfg, built, 7, clusters).replace(
+    (out / "assets").mkdir()
+    for f in (Path(__file__).parent / "static").iterdir():
+        shutil.copy(f, out / "assets" / f.name)
+    intraday = sample.intraday(cos)
+    page = render_index(featured, cos, cfg, built, 7, clusters, intraday).replace(
         "<div class=wrap>", "<div class=wrap><p class=sample>Sample site with made-up companies and people.</p>", 1)
     (out / "index.html").write_text(page, encoding="utf-8")
     for co in cos.values():

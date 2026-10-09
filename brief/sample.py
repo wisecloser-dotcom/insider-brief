@@ -30,6 +30,29 @@ def _trade(co, days, close, i, insider, position, code, shares_n, held_after, pl
             "chart_price": price}
 
 
+def intraday(cos: dict) -> dict:
+    """Made-up hourly closes for the last 6 trading days, ending at each sample price."""
+    out = {}
+    for n, co in enumerate(cos.values()):
+        rng = np.random.default_rng(40 + n)
+        days = pd.bdate_range(end="2026-10-08", periods=6)
+        times = [f"{d.date()} {h:02d}:30" for d in days for h in range(9, 16)]
+        walk = np.exp(np.cumsum(rng.normal(0.0004, 0.006, len(times))))
+        closes = co["price"] * walk / walk[-1]
+        out[co["ticker"]] = list(zip(times, [float(c) for c in closes]))
+    return out
+
+
+def _ohlc(days, close, seed):
+    rng = np.random.default_rng(seed)
+    o = np.r_[close[0], close[:-1]] * np.exp(rng.normal(0, 0.006, len(close)))
+    hi = np.maximum(o, close) * (1 + np.abs(rng.normal(0, 0.012, len(close))))
+    lo = np.minimum(o, close) * (1 - np.abs(rng.normal(0, 0.012, len(close))))
+    v = rng.lognormal(13, 0.5, len(close))
+    r = lambda a: [round(float(x), 4) for x in a]
+    return {"t": [str(d.date()) for d in days], "o": r(o), "h": r(hi), "l": r(lo), "c": r(close), "v": [int(x) for x in v]}
+
+
 def companies():
     out = []
     specs = [
@@ -43,7 +66,7 @@ def companies():
               "adv": float(close[-1]) * (380_000 if n == 0 else 2_100_000),
               "shares_out": so, "market_cap": so * float(close[-1]),
               "chart": {"dates": [str(d.date()) for d in days], "close": [float(x) for x in close]},
-              "edgar_url": "https://www.sec.gov/"}
+              "edgar_url": "https://www.sec.gov/", "ohlc": _ohlc(days, close, 70 + n)}
         if n == 0:
             tr = [_trade(co, days, close, 124, "Rivera Elena M.", "Chief Executive Officer, Director", "P", 60_000, 1_840_000, headline=True, cik="11"),
                   _trade(co, days, close, 123, "Okafor Daniel", "Chief Financial Officer", "P", 12_000, 95_000, headline=True, cik="12"),

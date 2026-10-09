@@ -65,4 +65,7 @@ On Windows, use `py` instead of `python` if `python` isn't found.
 - Company pages exist for companies with a qualifying trade in the window. To look up any other
   company, run the `ticker` command on your computer.
 
+Charts use TradingView's open-source Lightweight Charts library (Apache 2.0, included in
+`brief/static/` with its license).
+
 Information only, not investment advice.
