@@ -325,8 +325,15 @@ def ext_links(co: dict) -> str:
     from urllib.parse import quote
     yahoo = f"https://finance.yahoo.com/quote/{quote(tk)}"
     x = f"https://x.com/search?q={quote('$' + tk.replace('-', '.'))}&f=live"
-    return (f"<p class=ext><a class=extlink href=\"{e(yahoo)}\">Yahoo Finance</a>"
-            f"<a class=extlink href=\"{e(x)}\">${e(tk.replace('-', '.'))} on X</a></p>")
+    sa = f"https://stockanalysis.com/stocks/{quote(tk.lower().replace('-', '.'))}/"
+    # Simply Wall St pages need industry + exchange + name in the address, so jump to the
+    # top search result restricted to their US stock pages instead
+    from .news import clean_name
+    sws = ("https://duckduckgo.com/?q=" +
+           quote(f"!ducky site:simplywall.st/stocks/us {tk} {clean_name(co.get('name') or '')}"))
+    links = [("Yahoo Finance", yahoo), ("Stock Analysis", sa), ("Simply Wall St", sws),
+             (f"${tk.replace('-', '.')} on X", x)]
+    return "<p class=ext>" + "".join(f"<a class=extlink href=\"{e(u)}\">{e(t)}</a>" for t, u in links) + "</p>"
 
 
 def company_section(co: dict, mode: str) -> str:
