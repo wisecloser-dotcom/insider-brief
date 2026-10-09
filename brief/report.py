@@ -296,7 +296,7 @@ def related_table(co: dict) -> str:
 def news_block(co: dict) -> str:
     ks = "".join(f"<li><span class=d>{nice_date(k['date'])}</span><a href=\"{e(k['url'])}\">{e('; '.join(k['what']))}</a></li>"
                  for k in co["eight_ks"]) or "<li class=muted>No 8-K filings in the last 90 days.</li>"
-    ns = "".join(f"<li><span class=d>{nice_date(n['date'])}</span><span><a href=\"{e(n['url'])}\">{e(n['title'])}</a>"
+    ns = "".join(f"<li><span class=d>{nice_date(n['date'])}</span><span><a class=newslink href=\"{e(n['url'])}\">{e(n['title'])}</a>"
                  f" <span class=muted>{e(n['source'])}</span></span></li>" for n in co["news"]) \
         or "<li class=muted>No headlines found. Try searching the company name yourself.</li>"
     return (f"<div class=news><div><h4>Official company announcements (8-K)</h4><ul>{ks}</ul></div>"

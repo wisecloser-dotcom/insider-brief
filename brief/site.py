@@ -214,7 +214,7 @@ window.ibRender=()=>{const s=ibLoad(),items=Object.values(s).sort((a,b)=>b.saved
   const mv=now&&x.p?now[0]/x.p-1:null;
   return '<article class="trade saved '+(x.s==='P'?'buy':'sell')+'"><header><span class=side>'+(x.s==='P'?'Buy':'Sell')+'</span>'+
    '<h3>'+(pg?'<a href="'+esc(x.page)+'">'+esc(x.tk)+'</a>':esc(x.tk))+'</h3><p>'+esc(x.co)+'</p>'+
-   '<span class=hdr-r><a href="'+esc(x.url)+'">Form 4 on EDGAR</a><button type=button class="star txt" data-del="'+esc(x.k)+'">Remove</button></span></header>'+
+   '<span class=hdr-r><a href="'+esc(x.url)+'" target=_blank rel=noopener>Form 4 on EDGAR</a><button type=button class="star txt" data-del="'+esc(x.k)+'">Remove</button></span></header>'+
    '<dl><div><dt>Insider</dt><dd>'+esc(x.who)+'<br><span class=muted>'+esc(x.pos)+'</span></dd></div>'+
    '<div><dt>Amount</dt><dd><b class=big>'+money(x.v)+'</b><br><span class=muted>at '+money(x.p)+'</span></dd></div>'+
    '<div><dt>Traded / filed</dt><dd>'+day(x.td)+'<br><span class=muted>filed '+day(x.fd)+'</span></dd></div>'+
@@ -332,8 +332,19 @@ table.feed td.dt{white-space:nowrap}table.feed td:nth-child(3){min-width:120px}
 """
 
 
+def edgar_new_tab(html: str) -> str:
+    """SEC EDGAR links and news headlines open in a new tab; everything else stays in the same tab."""
+    html = re.sub(r'<a href="(https://www\.sec\.gov[^"]*)"', r'<a href="\1" target=_blank rel=noopener', html)
+    return html.replace('<a class=newslink ', '<a class=newslink target=_blank rel=noopener ')
+
+
 def shell(title, subtitle, facts, body, built_ts, status_url, script=True, note="",
           compact=False) -> str:
+    return edgar_new_tab(_shell(title, subtitle, facts, body, built_ts, status_url, script, note, compact))
+
+
+def _shell(title, subtitle, facts, body, built_ts, status_url, script=True, note="",
+           compact=False) -> str:
     when = datetime.fromtimestamp(built_ts, SGT)
     root = status_url[: -len("status.json")]
     facts_html = "".join(f"<div><dt>{k}</dt><dd>{v}</dd></div>" for k, v in facts)
@@ -344,7 +355,6 @@ def shell(title, subtitle, facts, body, built_ts, status_url, script=True, note=
             f"<dl class=facts>{facts_html}</dl><p class=status>{status}</p></header>")
     return f"""<!doctype html><html lang=en><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1"><title>{e(title)}</title>
-<base target=_blank>
 <link rel=preconnect href=https://fonts.googleapis.com>
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel=stylesheet>
 <style>{report.CSS}{SITE_CSS}</style>
