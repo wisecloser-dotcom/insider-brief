@@ -295,7 +295,7 @@ border-left:1px solid var(--rule);padding:4px 11px;cursor:pointer}.ranges button
 .tv{height:440px}
 @media (max-width:720px){.tv{height:340px}}
 .badge{display:inline-block;font-size:12px;font-weight:700;padding:0 6px;margin-top:3px;white-space:nowrap}
-.badge.cl{background:var(--mark);color:#1B2A3A}.badge.fb{border:1px solid currentColor;color:var(--ink)}
+.badge.cl{background:var(--mark);color:#1B2A3A}.badge.scl{background:var(--sell);color:#fff}.badge.fb{border:1px solid currentColor;color:var(--ink)}
 table.feed .up{color:var(--buy);font-weight:600}table.feed .down{color:var(--sell);font-weight:600}
 @media (max-width:720px){#count{margin-left:0;width:100%}
  .strip{grid-template-columns:1fr 1fr}.sc:nth-child(3){border-left:0}.sc:nth-child(n+3){border-top:1px solid var(--rule)}
@@ -455,10 +455,13 @@ def render_index(featured, cos, cfg, built_ts, window_days, clusters=None, intra
                    if src.get("pct_company_after") else "")) if src.get("held_after") else "n/a"
         q = f"{tk} {t['company']} {t['insider']} {' '.join(t.get('joint_filers') or [])}".lower()
         late = form4.days_late(t)
-        cl = clusters.get(t["issuer_cik"], {}).get("n", 0) if t["code"] == "P" else 0
+        ci = clusters.get(t["issuer_cik"], {})
+        cl = ci.get("n", 0) if t["code"] == "P" else 0
+        scl = ci.get("sell_n", 0) if (t["code"] == "S" and not t["plan_10b5_1"]) else 0
         fb = src.get("first_buy_label") if t["code"] == "P" else None
-        sig = " ".join(x for x, on in (("cluster", cl >= 2), ("first", bool(fb))) if on)
+        sig = " ".join(x for x, on in (("cluster", cl >= 2), ("scluster", scl >= 2), ("first", bool(fb))) if on)
         tags = ((f"<br><span class='badge cl'>Cluster: {cl} buyers</span>" if cl >= 2 else "")
+                + (f"<br><span class='badge scl'>Sell cluster: {scl} sellers</span>" if scl >= 2 else "")
                 + (f"<br><span class='badge fb'>{e(fb)}</span>" if fb else "")
                 + (f"<br><span class=plan>{e(src['earnings_tag'])}</span>" if src.get("earnings_tag") else "")
                 + ("<br><span class=plan>10b5-1 plan</span>" if t["plan_10b5_1"] else "")
@@ -502,7 +505,7 @@ def render_index(featured, cos, cfg, built_ts, window_days, clusters=None, intra
   <option value=director>Directors</option><option value=tenpct>10% owners</option></select></label>
  <label>At least <select name=min><option value=0>Any amount</option><option value=100000>$100k</option>
   <option value=500000>$500k</option><option value=1000000>$1M</option><option value=5000000>$5M</option></select></label>
- <label>Signal <select name=sig><option value=all>Any</option><option value=cluster>Cluster buys (7 days)</option>
+ <label>Signal <select name=sig><option value=all>Any</option><option value=cluster>Cluster buys (7 days)</option><option value=scluster>Cluster sells (7 days)</option>
   <option value=first>First buy in 1+ yr</option></select></label>
  <label>Since trade <select name=mv><option value=all>Any move</option>
   <option value=lt5>Under +5% (incl. falling)</option><option value=5-10>+5% to +10%</option>

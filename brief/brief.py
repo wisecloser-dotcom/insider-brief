@@ -97,12 +97,26 @@ CLUSTER_DAYS = 7   # 2+ different insiders buying the same stock within this man
 
 
 def cluster(trades: list[dict], days: int = CLUSTER_DAYS, today: date | None = None) -> dict:
-    """Distinct insiders who bought on the open market in the last `days` days."""
+    """Buy and sell clusters: separate insiders (related entities merged into one group)
+    trading the same stock on the open market in the last `days` days.
+    Pre-arranged 10b5-1 plan sales don't count toward a sell cluster."""
     cut = str((today or date.today()) - timedelta(days=days))
-    buys = [t for t in trades if t["code"] == "P" and (t.get("trade_date") or "") >= cut]
-    names = list(dict.fromkeys(t["insider"] for t in buys))
-    return {"n": len({t["insider_cik"] for t in buys}), "insiders": names, "days": days,
-            "value": float(sum(t["value"] for t in buys))}
+    groups = form4.insider_groups(trades)
+    def side(code, keep=lambda t: True):
+        ts = [t for t in trades if t["code"] == code and (t.get("trade_date") or "") >= cut and keep(t)]
+        by_group = {}
+        for t in ts:
+            g = groups.get(t.get("insider_cik") or t.get("insider"), t.get("insider_cik"))
+            by_group.setdefault(g, []).append(t["insider"])
+        labels = []
+        for names in by_group.values():
+            u = list(dict.fromkeys(names))
+            labels.append(u[0] + (f" (+{len(u) - 1} related)" if len(u) > 1 else ""))
+        return len(by_group), labels, float(sum(t["value"] for t in ts))
+    n, names, value = side("P")
+    sn, snames, svalue = side("S", lambda t: not t.get("plan_10b5_1"))
+    return {"n": n, "insiders": names, "value": value, "days": days,
+            "sell_n": sn, "sell_insiders": snames, "sell_value": svalue}
 
 
 def first_buy_label(h: dict, trade_date: str, years: int = 5) -> tuple[str | None, str | None]:

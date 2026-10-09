@@ -305,11 +305,16 @@ def news_block(co: dict) -> str:
 
 def cluster_note(co: dict) -> str:
     c = co.get("cluster") or {}
-    if c.get("n", 0) < 2:
-        return ""
-    names = ", ".join(e(n) for n in c["insiders"][:6]) + (" and others" if len(c["insiders"]) > 6 else "")
-    return (f"<p class=callout><b>Cluster buy:</b> {c['n']} insiders bought {money(c['value'])} "
-            f"in the last {c.get('days', 7)} days ({names}).</p>")
+    out = ""
+    lst = lambda ns: ", ".join(e(n) for n in ns[:6]) + (" and others" if len(ns) > 6 else "")
+    if c.get("n", 0) >= 2:
+        out += (f"<p class=callout><b>Cluster buy:</b> {c['n']} separate insiders bought {money(c['value'])} "
+                f"in the last {c.get('days', 7)} days ({lst(c['insiders'])}).</p>")
+    if c.get("sell_n", 0) >= 2:
+        out += (f"<p class='callout mixed'><b>Cluster sell:</b> {c['sell_n']} separate insiders sold "
+                f"{money(c['sell_value'])} in the last {c.get('days', 7)} days, not counting pre-arranged "
+                f"10b5-1 plan sales ({lst(c['sell_insiders'])}).</p>")
+    return out
 
 
 def company_section(co: dict, mode: str) -> str:

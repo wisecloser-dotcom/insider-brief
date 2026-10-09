@@ -45,6 +45,58 @@ def clean_ticker(x) -> str:
     return t.replace(".", "-")   # BRK.B -> BRK-B, the form Yahoo uses
 
 
+ENTITY_RE = re.compile(r"\b(l\.?l\.?c|l\.?p|l\.?l\.?p|inc|corp|co|ltd|fund|funds|trust|partners?|capital|"
+                       r"management|holdings?|advisors?|advisers|group|investments?|ventures?|associates|"
+                       r"master|offshore|onshore|opportunit(?:y|ies)|equity|gp|spv|plc|s\.?a|n\.?v|ag|"
+                       r"limited|company|the|and|of|de|[ivx]+|\d+)\b\.?", re.I)
+
+
+def entity_stem(name: str) -> str | None:
+    """'Saba Capital Master Fund, Ltd.' and 'Saba Capital Management, L.P.' -> 'saba'.
+    Only for organisations: two people who share a surname are not merged."""
+    n = (name or "").lower()
+    if not re.search(r"\b(llc|l\.l\.c|lp|l\.p|fund|trust|partners|capital|management|holdings|advisors|"
+                     r"ltd|inc|corp|investments|ventures|group|spv|plc)\b", n):
+        return None
+    words = [w for w in re.split(r"[^a-z0-9&]+", ENTITY_RE.sub(" ", n)) if len(w) > 1]
+    return " ".join(words[:2]) if words else None
+
+
+def insider_groups(trades: list[dict]) -> dict:
+    """Map each insider CIK to a group id, merging related filers: entities that file
+    Form 4s together (a fund and its manager) or share a name stem (Fund IV / Fund V)."""
+    parent = {}
+    def find(x):
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra
+    by_name, by_stem = {}, {}
+    for t in trades:
+        c = t.get("insider_cik") or t.get("insider")
+        find(c)
+        by_name[(t.get("insider") or "").lower()] = c
+    for t in trades:
+        c = t.get("insider_cik") or t.get("insider")
+        for jc in t.get("joint_ciks") or []:
+            union(c, jc)
+        for jn in t.get("joint_filers") or []:
+            if jn.lower() in by_name:
+                union(c, by_name[jn.lower()])
+        st = entity_stem(t.get("insider"))
+        if st:
+            if st in by_stem:
+                union(c, by_stem[st])
+            else:
+                by_stem[st] = c
+    return {c: find(c) for c in list(parent)}
+
+
 def dedupe_joint(trades: list[dict]) -> list[dict]:
     """Funds often report one trade under several related entities (a fund, its
     manager, its general partner). Show it once and list the other filers."""
@@ -156,6 +208,7 @@ def open_market_trades(f: dict, accession: str, filing_date: str, url: str) -> l
             "is_director": owner.get("is_director", False), "is_officer": owner.get("is_officer", False),
             "is_ten_pct": owner.get("is_ten_pct", False),
             "joint_filers": [o["name"] for o in f["owners"][1:]],
+            "joint_ciks": [o["cik"] for o in f["owners"][1:] if o.get("cik")],
             "side": side, "code": code, "shares": shares, "price": value / shares, "value": value,
             "owned_after": after, "direct": last["direct"],
             "stake_change": (shares / before * (1 if code == "P" else -1)) if before and before > 0 else None,

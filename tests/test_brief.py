@@ -247,3 +247,24 @@ def test_track_record_and_panels(monkeypatch):
     assert "52-week range" in report.range_panel(co) or "6-month range" in report.range_panel(co)
     assert "Their earlier buys: 3 earlier buys" in report.trade_block(co["trades"][0], co)
     assert 'data-save="' in report.save_button(co["trades"][0], co)
+
+
+def test_sell_clusters_and_related_entities():
+    from datetime import date
+    from brief.brief import cluster
+    T = lambda cik, who, d, code="P", plan=False, joint=(): {
+        "insider_cik": cik, "insider": who, "trade_date": d, "code": code, "value": 1e6,
+        "plan_10b5_1": plan, "joint_filers": [], "joint_ciks": list(joint)}
+    today = date(2026, 10, 9)
+    # Fund IV and Fund V of one group, plus the group's manager filing jointly: one buyer, not three
+    c = cluster([T("1", "Silver Lake Partners IV, L.P.", "2026-10-06"),
+                 T("2", "Silver Lake Partners V DE (AIV), L.P.", "2026-10-07"),
+                 T("3", "SL SPV-2, L.P.", "2026-10-07", joint=["2"])], today=today)
+    assert c["n"] == 1 and "related" in c["insiders"][0]
+    # two genuinely separate buyers still make a cluster
+    assert cluster([T("1", "Saba Capital Master Fund, Ltd.", "2026-10-06"),
+                    T("9", "Doe Jane", "2026-10-05")], today=today)["n"] == 2
+    # sells: two separate sellers cluster; a 10b5-1 plan sale doesn't count
+    s = cluster([T("4", "Smith John", "2026-10-06", "S"), T("5", "Smith Jane", "2026-10-07", "S"),
+                 T("6", "Lee Ann", "2026-10-08", "S", plan=True)], today=today)
+    assert s["sell_n"] == 2 and s["n"] == 0
