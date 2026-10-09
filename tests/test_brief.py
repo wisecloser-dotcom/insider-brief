@@ -151,3 +151,14 @@ def test_full_site_build_with_awkward_data(tmp_path, monkeypatch):
     page = (tmp_path / "site" / "c" / "AAPL.html").read_text()
     assert "Doe Jane" in idx and "6 Oct 2026" in idx
     assert "<svg" in page and "Earnings results" in page
+
+
+def test_tickers_dedupe_and_late():
+    assert form4.clean_ticker("N/A") == "" and form4.clean_ticker("none") == ""
+    assert form4.clean_ticker("brk.b") == "BRK-B" and form4.clean_ticker("GOOGL, GOOG") == "GOOGL"
+    base = {"issuer_cik": "1", "trade_date": "2026-10-06", "code": "S", "shares": 1000.0, "price": 10.0,
+            "insider_cik": "a", "insider": "Fund IV LP", "joint_filers": []}
+    out = form4.dedupe_joint([base, dict(base, insider_cik="b", insider="Fund GP LLC"),
+                              dict(base, insider_cik="c", insider="Other Person", shares=5.0)])
+    assert len(out) == 2 and out[0]["joint_filers"] == ["Fund GP LLC"]
+    assert form4.days_late({"filing_date": "2026-10-08", "trade_date": "2026-09-01"}) == 37

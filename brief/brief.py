@@ -3,7 +3,7 @@ from datetime import date, timedelta
 
 import pandas as pd
 
-from . import market, news
+from . import form4, market, news
 from .config import Config
 from .edgar import Edgar
 
@@ -43,14 +43,21 @@ def company(ed: Edgar, cfg: Config, cik, ticker: str, name: str,
     px = market.history(ticker, months=cfg.chart_months + 1) if ticker else None
     s = market.summary(px)
     shares_out = ed.shares_outstanding(cik)
-    mcap = shares_out * s["price"] if (shares_out and s["price"]) else (
-        market.market_cap_fallback(ticker) if ticker else None)
+    mcap = shares_out * s["price"] if (shares_out and s["price"]) else None
+    yf_mcap = market.market_cap_fallback(ticker) if ticker else None
+    # SEC share counts can be in ordinary shares while the US price is per ADR, or stale
+    # after a reverse split. If the two estimates disagree by more than 3x, trust Yahoo's.
+    if yf_mcap and (not mcap or not (1 / 3 < mcap / yf_mcap < 3)):
+        mcap = yf_mcap
+        shares_out = yf_mcap / s["price"] if s["price"] else None
 
     if related is None:
         related = ed.company_trades(cik, since)
     seen = {_key(t) for t in related}
-    related = related + [t for t in headline if _key(t) not in seen]
     head_keys = {_key(t) for t in headline}
+    # when a fund reports one trade under several entities, keep the headline copy
+    merged = related + [t for t in headline if _key(t) not in seen]
+    related = form4.dedupe_joint(sorted(merged, key=lambda t: _key(t) not in head_keys))
 
     price_cache = {}
     for t in related:
@@ -61,6 +68,12 @@ def company(ed: Edgar, cfg: Config, cik, ticker: str, name: str,
         t["held_value_after"] = t["held_after"] * p if (t["held_after"] and p) else None
         t["held_value_before"] = t["held_before"] * p if (t["held_before"] and p) else None
         t["pct_company_after"] = t["held_after"] / shares_out if (t["held_after"] and shares_out) else None
+        # anything above 100% means the inputs don't match (wrong share class, bad filing)
+        if t["pct_mcap"] and t["pct_mcap"] > 1:
+            t["pct_mcap"] = None
+        if t["pct_company_after"] and t["pct_company_after"] > 1:
+            t["pct_company_after"] = None
+        t["days_late"] = form4.days_late(t)
         t["chart_price"] = market.to_chart_scale(px, t["trade_date"], t["price"])
     for t in related:
         if t["headline"]:

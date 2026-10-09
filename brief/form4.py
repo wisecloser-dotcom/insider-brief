@@ -34,6 +34,40 @@ def _date(x):
     return m.group(0) if m else None
 
 
+def clean_ticker(x) -> str:
+    """Filers sometimes write N/A, NONE or several symbols; keep one usable ticker or ''."""
+    t = (x or "").upper().strip()
+    if t in ("N/A", "N.A.", "NA", "NONE", "NULL", "-", "--", "TBD", "NOT APPLICABLE"):
+        return ""
+    t = re.split(r"[\s,;/]+", t)[0]
+    if not re.fullmatch(r"[A-Z0-9.\-]{1,10}", t):
+        return ""
+    return t.replace(".", "-")   # BRK.B -> BRK-B, the form Yahoo uses
+
+
+def dedupe_joint(trades: list[dict]) -> list[dict]:
+    """Funds often report one trade under several related entities (a fund, its
+    manager, its general partner). Show it once and list the other filers."""
+    out, seen = [], {}
+    for t in trades:
+        k = (t["issuer_cik"], t["trade_date"], t["code"], round(t["shares"]), round(t["price"], 2))
+        if k in seen and seen[k]["insider_cik"] != t["insider_cik"]:
+            first = seen[k]
+            first["joint_filers"] = list(dict.fromkeys(first.get("joint_filers", []) + [t["insider"]]))
+            continue
+        seen[k] = t
+        out.append(t)
+    return out
+
+
+def days_late(t: dict) -> int | None:
+    try:
+        from datetime import date
+        return (date.fromisoformat(t["filing_date"][:10]) - date.fromisoformat(t["trade_date"][:10])).days
+    except Exception:
+        return None
+
+
 def _flag(x) -> bool:
     return (x or "").strip().lower() in ("1", "true", "y", "yes")
 
@@ -93,7 +127,7 @@ def parse(xml_bytes: bytes) -> dict:
         "period": _date(_v(root, "periodOfReport")),
         "issuer_cik": (_v(issuer, "issuerCik") or "").lstrip("0"),
         "issuer_name": _v(issuer, "issuerName") or "",
-        "ticker": (_v(issuer, "issuerTradingSymbol") or "").upper().strip(),
+        "ticker": clean_ticker(_v(issuer, "issuerTradingSymbol")),
         "owners": owners,
         "plan_10b5_1": plan,
         "rows": rows,

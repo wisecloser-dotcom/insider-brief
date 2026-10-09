@@ -123,6 +123,8 @@ def trade_block(t: dict, co: dict) -> str:
     flags = []
     if t["plan_10b5_1"]:
         flags.append("Pre-arranged 10b5-1 plan trade")
+    if (t.get("days_late") or 0) > 10:
+        flags.append(f"Filed {t['days_late']} days after the trade (the rule is 2 business days)")
     if not t["direct"]:
         flags.append("Held indirectly (trust, family or fund)")
     if t["joint_filers"]:

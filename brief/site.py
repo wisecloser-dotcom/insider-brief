@@ -27,6 +27,11 @@ from .report import e, money, nice_date, pct, shares
 FEED = ("https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=4&company=&dateb="
         "&owner=include&start={start}&count=100&output=atom")
 SGT = timezone(timedelta(hours=8))
+CACHE_VERSION = 2   # bump to rebuild every cached company page after a logic change
+
+
+def page_name(ticker: str) -> str:
+    return re.sub(r"[^A-Za-z0-9-]", "_", ticker or "unknown")
 
 
 def warn(msg):
@@ -126,9 +131,13 @@ def update(ed: Edgar, cfg: Config, st: State, backfill_days: int = 3, log=print)
 # ---------------------------------------------------------------------------
 def _featured(st: State, cfg: Config, window_days: int) -> list[dict]:
     cut = str(date.today() - timedelta(days=window_days))
-    return [t for t in st.trades if t["ticker"] and t["filing_date"] >= cut and (
-        (t["code"] == "P" and t["value"] >= cfg.min_buy_usd) or
-        (t["code"] == "S" and t["value"] >= cfg.min_sell_usd))]
+    for t in st.trades:
+        t["ticker"] = form4.clean_ticker(t.get("ticker"))
+    keep = [dict(t, joint_filers=list(t.get("joint_filers") or [])) for t in st.trades
+            if t["ticker"] and t["filing_date"] >= cut and (
+                (t["code"] == "P" and t["value"] >= cfg.min_buy_usd) or
+                (t["code"] == "S" and t["value"] >= cfg.min_sell_usd))]
+    return form4.dedupe_joint(sorted(keep, key=lambda t: (t["filing_date"], t["accession"])))
 
 
 def _key(t):
@@ -147,13 +156,14 @@ def enrich(ed: Edgar, cfg: Config, st: State, featured: list[dict], max_enrich: 
         p = st.company_path(cik)
         cached = json.loads(p.read_text()) if p.exists() else None
         want = {_key(t) for t in heads}
-        fresh = (cached and time.time() - cached["_built"] < max_age_hours * 3600
+        fresh = (cached and cached.get("_v") == CACHE_VERSION
+                 and time.time() - cached["_built"] < max_age_hours * 3600
                  and want <= set(cached["_heads"]))
         if not fresh and done < max_enrich:
             try:
                 co = brief.company(ed, cfg, cik, heads[0]["ticker"], heads[0]["company"],
                                    [dict(t) for t in heads], log=log)
-                co["_built"], co["_heads"] = time.time(), sorted(want)
+                co["_built"], co["_heads"], co["_v"] = time.time(), sorted(want), CACHE_VERSION
                 p.write_text(json.dumps(co, default=str))
                 cached = co
                 done += 1
@@ -203,7 +213,7 @@ table.feed .tk a{font-weight:800;font-size:16px}
 tbody[data-day] th.day{font-size:14px;color:var(--ink);padding-top:22px;border-bottom:2px solid var(--ink)}
 .back{display:inline-block;margin-bottom:4px;font-size:14px}
 section.co:first-of-type{margin-top:10px}
-.plan{font-size:12px;color:var(--muted)}
+.plan,.late{font-size:12px;color:var(--muted);white-space:nowrap}.late{color:var(--sell)}
 @media (max-width:720px){#count{margin-left:0;width:100%}
  .feed th:nth-child(2),.feed td:nth-child(2),.feed th:nth-child(6),.feed td:nth-child(6),
  .feed th:nth-child(7),.feed td:nth-child(7),.feed th:nth-child(8),.feed td:nth-child(8),
@@ -258,17 +268,23 @@ def render_index(featured, cos, cfg, built_ts, window_days) -> str:
         tk = t["ticker"]
         enriched = next((x for x in co["trades"] if _key(x) == _key(t)), None) if co else None
         src = enriched or t
-        link = f'<a href="c/{e(tk)}.html">{e(tk)}</a>' if co else e(tk)
+        link = f'<a href="c/{page_name(tk)}.html">{e(tk)}</a>' if co else e(tk)
         held = (f"{shares(src['held_after'])}"
                 + (f"<br><span class=muted>{pct(src.get('pct_company_after'))} of co.</span>"
                    if src.get("pct_company_after") else "")) if src.get("held_after") else "n/a"
-        q = f"{tk} {t['company']} {t['insider']}".lower()
+        q = f"{tk} {t['company']} {t['insider']} {' '.join(t.get('joint_filers') or [])}".lower()
+        late = form4.days_late(t)
+        tags = ("<br><span class=plan>10b5-1 plan</span>" if t["plan_10b5_1"] else "") + (
+            f"<br><span class=late>Filed {late} days late</span>" if late and late > 10 else "")
+        others = len(t.get("joint_filers") or [])
+        who = e(t["insider"]) + (f" <span class=muted>+{others} related filer{'s' if others > 1 else ''}</span>"
+                                 if others else "")
         rows_by_day.setdefault(t["filing_date"], []).append(
             f"<tr class={'buy' if t['code']=='P' else 'sell'} data-side={t['code']} data-value={t['value']:.0f} "
             f"data-plan={int(t['plan_10b5_1'])} data-role=\"{_role(t)}\" data-q=\"{e(q)}\">"
             f"<td class=tk>{link}</td><td>{e(t['company'])}</td>"
-            f"<td>{e(t['insider'])}<br><span class=muted>{e(t['position'])}</span></td>"
-            f"<td><span class=side>{t['side']}</span>{'<br><span class=plan>10b5-1 plan</span>' if t['plan_10b5_1'] else ''}</td>"
+            f"<td>{who}<br><span class=muted>{e(t['position'])}</span></td>"
+            f"<td><span class=side>{t['side']}</span>{tags}</td>"
             f"<td class=n><b>{money(t['value'])}</b></td>"
             f"<td class=n>{pct(src.get('pct_mcap')) if src.get('pct_mcap') else 'n/a'}</td>"
             f"<td class=n>{held}</td><td>{nice_date(t['trade_date'])}</td>"
@@ -323,7 +339,7 @@ def build(ed: Edgar, cfg: Config, out: Path, window_days=7, max_enrich=40,
     for co in cos.values():
         if co.get("ticker"):
             try:   # one odd filing must never take the whole site down
-                (tmp / "c" / f"{co['ticker']}.html").write_text(render_company(co, built), encoding="utf-8")
+                (tmp / "c" / f"{page_name(co['ticker'])}.html").write_text(render_company(co, built), encoding="utf-8")
             except Exception as err:
                 warn(f"page for {co['ticker']} skipped: {err!r}")
     (tmp / "status.json").write_text(json.dumps({"built": int(built), "trades": len(featured)}))
@@ -346,5 +362,5 @@ def build_sample(out: Path):
         "<div class=wrap>", "<div class=wrap><p class=sample>Sample site with made-up companies and people.</p>", 1)
     (out / "index.html").write_text(page, encoding="utf-8")
     for co in cos.values():
-        (out / "c" / f"{co['ticker']}.html").write_text(render_company(co, built), encoding="utf-8")
+        (out / "c" / f"{page_name(co['ticker'])}.html").write_text(render_company(co, built), encoding="utf-8")
     (out / "status.json").write_text(json.dumps({"built": int(built)}))
