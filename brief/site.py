@@ -481,6 +481,9 @@ const candles=chart.addSeries(L.CandlestickSeries,{upColor:css('--buy'),downColo
   borderVisible:false,wickUpColor:css('--buy'),wickDownColor:css('--sell')});
 candles.setData(D.t.map((t,i)=>({time:t,open:D.o[i],high:D.h[i],low:D.l[i],close:D.c[i]})));
 candles.priceScale().applyOptions({scaleMargins:{top:0.08,bottom:0.24}});
+const line=chart.addSeries(L.LineSeries,{color:css('--ink'),lineWidth:2,visible:false,
+  crosshairMarkerRadius:4,lastValueVisible:true});
+line.setData(D.t.map((t,i)=>({time:t,value:D.c[i]})));
 const vol=chart.addSeries(L.HistogramSeries,{priceFormat:{type:'volume'},priceScaleId:'',lastValueVisible:false,priceLineVisible:false});
 vol.priceScale().applyOptions({scaleMargins:{top:0.8,bottom:0}});
 vol.setData(D.t.map((t,i)=>({time:t,value:D.v[i],color:(D.c[i]>=D.o[i]?css('--buy'):css('--sell'))+'55'})));
@@ -491,12 +494,19 @@ D.trades.forEach(x=>{const day=snap(x.d);(byDay[day]=byDay[day]||[]).push(x)});
 const marks=D.trades.filter(x=>x.d>=D.t[0]).map(x=>({time:snap(x.d),position:x.s==='P'?'belowBar':'aboveBar',
   shape:x.s==='P'?'arrowUp':'arrowDown',color:x.s==='P'?css('--buy'):css('--sell'),size:x.h?1.1:0.8,
   text:x.h?(x.s==='P'?'Buy ':'Sell ')+x.v:'',id:x.k})).sort((a,b)=>a.time<b.time?-1:a.time>b.time?1:0);
-L.createSeriesMarkers(candles,marks);
+L.createSeriesMarkers(candles,marks);L.createSeriesMarkers(line,marks);
 // the trade you clicked: dashed line at the insider's price, and zoom to it
 const focus=(location.hash.match(/t=(\d{4}-\d{2}-\d{2})/)||[])[1];
 const ft=focus&&D.trades.find(x=>x.d===focus&&x.h)||D.trades.find(x=>x.h);
-if(ft)candles.createPriceLine({price:ft.p,color:css('--ink'),lineWidth:1,lineStyle:2,axisLabelVisible:true,
-  title:(ft.s==='P'?'Insider buy ':'Insider sell ')+'$'+ft.p.toFixed(2)});
+if(ft)[candles,line].forEach(s=>s.createPriceLine({price:ft.p,color:css('--ink'),lineWidth:1,lineStyle:2,
+  axisLabelVisible:true,title:(ft.s==='P'?'Insider buy ':'Insider sell ')+'$'+ft.p.toFixed(2)}));
+// Candles / Line switch, remembered between visits
+const kinds=[...box.querySelectorAll('[data-kind]')];
+const setKind=k=>{candles.applyOptions({visible:k==='candles'});line.applyOptions({visible:k==='line'});
+  kinds.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.kind===k)));try{localStorage.setItem('ib-chart',k)}catch(_){}};
+kinds.forEach(b=>b.addEventListener('click',()=>setKind(b.dataset.kind)));
+let saved='candles';try{saved=localStorage.getItem('ib-chart')||'candles'}catch(_){}
+setKind(saved==='line'?'line':'candles');
 const last=D.t[D.t.length-1];
 const back=(d,days)=>{const x=new Date(d+'T00:00:00Z');x.setUTCDate(x.getUTCDate()-days);return x.toISOString().slice(0,10)};
 const setRange=days=>{if(!days){chart.timeScale().fitContent();return}
@@ -519,7 +529,8 @@ chart.subscribeCrosshairMove(p=>{el.style.cursor=(p.time&&byDay[p.time])?'pointe
   if(!p.time){show(D.t.length-1);return}const i=D.t.indexOf(p.time);if(i>=0)show(i)});
 chart.subscribeClick(p=>{const hit=p.hoveredObjectId&&D.trades.find(x=>x.k===p.hoveredObjectId);
   const list=hit?[hit]:(p.time&&byDay[p.time])||[];if(list.length)window.showTrades(list.map(x=>x.k))});
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>chart.applyOptions(theme()));
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{chart.applyOptions(theme());
+  line.applyOptions({color:css('--ink')})});
 })();
 """
 
@@ -535,7 +546,10 @@ def tv_block(co: dict) -> str:
     data = json.dumps({**o, "trades": trades}).replace("</", "<\\/")
     ranges = "".join(f'<button type=button data-r={d}>{l}</button>'
                      for l, d in (("1M", 30), ("3M", 91), ("6M", 182), ("1Y", 365), ("5Y", 0)))
-    return (f'<div id=tvbox class=tvbox hidden><div class=tvbar><div class=ranges role=group '
+    kinds = ('<div class=ranges role=group aria-label="Chart type">'
+             '<button type=button data-kind=candles>Candles</button>'
+             '<button type=button data-kind=line>Line</button></div>')
+    return (f'<div id=tvbox class=tvbox hidden><div class=tvbar>{kinds}<div class=ranges role=group '
             f'aria-label="Chart range">{ranges}</div><div id=tvlegend class=tvlegend aria-live=off></div></div>'
             f'<div id=tv class=tv></div></div>'
             f'<script type=application/json id=pxdata>{data}</script>')
