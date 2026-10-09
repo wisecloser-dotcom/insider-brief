@@ -182,9 +182,10 @@ def test_cluster_and_first_buy_labels():
     from datetime import date
     from brief.brief import cluster, first_buy_label
     t = lambda who, d, code="P", v=1e5: {"insider_cik": who, "insider": who, "trade_date": d, "code": code, "value": v}
-    c = cluster([t("a", "2026-10-06"), t("b", "2026-09-20"), t("a", "2026-10-01"),
-                 t("c", "2026-08-01"), t("d", "2026-10-05", "S")], today=date(2026, 10, 9))
-    assert c["n"] == 2 and c["insiders"] == ["a", "b"]          # c too old, d is a sale
+    c = cluster([t("a", "2026-10-06"), t("b", "2026-10-03"), t("a", "2026-10-01"),
+                 t("c", "2026-09-25"), t("d", "2026-10-05", "S")], today=date(2026, 10, 9))
+    assert c["n"] == 2 and c["insiders"] == ["a", "b"]          # c is 14 days back, d is a sale
+    assert cluster([t("a", "2026-10-06"), t("c", "2026-09-25")], days=30, today=date(2026, 10, 9))["n"] == 2
     assert first_buy_label({"prior_buy": "2022-03-01"}, "2026-10-06")[0] == "First buy in 4 yrs"
     assert first_buy_label({"prior_buy": "2026-06-01"}, "2026-10-06")[0] is None
     assert first_buy_label({"first_filing": "2026-07-01"}, "2026-10-06")[0] == "New insider, first buy"

@@ -202,7 +202,7 @@ def cluster_note(co: dict) -> str:
         return ""
     names = ", ".join(e(n) for n in c["insiders"][:6]) + (" and others" if len(c["insiders"]) > 6 else "")
     return (f"<p class=callout><b>Cluster buy:</b> {c['n']} insiders bought {money(c['value'])} "
-            f"in the last 30 days ({names}).</p>")
+            f"in the last {c.get('days', 7)} days ({names}).</p>")
 
 
 def company_section(co: dict, mode: str) -> str:

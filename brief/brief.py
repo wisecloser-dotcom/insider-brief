@@ -36,12 +36,15 @@ def insider_wealth(ed: Edgar, cfg: Config, t: dict, price_now: float | None, cac
             "trade_vs_holdings": (t["value"] / before) if before and before > 0 else None}
 
 
-def cluster(trades: list[dict], days: int = 30, today: date | None = None) -> dict:
+CLUSTER_DAYS = 7   # 2+ different insiders buying the same stock within this many days
+
+
+def cluster(trades: list[dict], days: int = CLUSTER_DAYS, today: date | None = None) -> dict:
     """Distinct insiders who bought on the open market in the last `days` days."""
     cut = str((today or date.today()) - timedelta(days=days))
     buys = [t for t in trades if t["code"] == "P" and (t.get("trade_date") or "") >= cut]
     names = list(dict.fromkeys(t["insider"] for t in buys))
-    return {"n": len({t["insider_cik"] for t in buys}), "insiders": names,
+    return {"n": len({t["insider_cik"] for t in buys}), "insiders": names, "days": days,
             "value": float(sum(t["value"] for t in buys))}
 
 

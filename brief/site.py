@@ -351,7 +351,7 @@ def strip_html(info: list[dict]) -> str:
         ("Biggest buy", money(big["t"]["value"]),
          f'{link(big)} <span class=muted>{e(big["t"]["position"])}'
          + (f', {pct(big["src"]["pct_mcap"])} of cap' if big["src"].get("pct_mcap") else "") + "</span>", None),
-        ("Cluster buys", co_word(n_cl), cl or "<span class=muted>None this week</span>",
+        ("Cluster buys, 7 days", co_word(n_cl), cl or "<span class=muted>None this week</span>",
          '{"side":"P","sig":"cluster"}' if n_cl else None),
         ("CEO and CFO buys", co_word(n_cs), cs or "<span class=muted>None this week</span>",
          '{"side":"P","role":"csuite"}' if n_cs else None),
@@ -424,7 +424,7 @@ def render_index(featured, cos, cfg, built_ts, window_days, clusters=None, intra
   <option value=director>Directors</option><option value=tenpct>10% owners</option></select></label>
  <label>At least <select name=min><option value=0>Any amount</option><option value=100000>$100k</option>
   <option value=500000>$500k</option><option value=1000000>$1M</option><option value=5000000>$5M</option></select></label>
- <label>Signal <select name=sig><option value=all>Any</option><option value=cluster>Cluster buys</option>
+ <label>Signal <select name=sig><option value=all>Any</option><option value=cluster>Cluster buys (7 days)</option>
   <option value=first>First buy in 1+ yr</option></select></label>
  <label><input type=checkbox name=noplan> Hide 10b5-1 plan trades</label>
  <span id=count aria-live=polite></span>
@@ -578,8 +578,8 @@ def build(ed: Edgar, cfg: Config, out: Path, window_days=7, max_enrich=40,
     log(f"  hourly prices for {len(intraday)} tickers")
     clusters = {}
     for cik in {t["issuer_cik"] for t in featured}:
-        if cik in cos and cos[cik].get("cluster"):
-            clusters[cik] = cos[cik]["cluster"]
+        if cik in cos:   # recomputed every run, so the window always ends today
+            cos[cik]["cluster"] = clusters[cik] = brief.cluster(cos[cik]["trades"])
         else:   # not enriched yet: use the trades we've collected ourselves
             clusters[cik] = brief.cluster(form4.dedupe_joint(
                 [dict(t) for t in st.trades if t["issuer_cik"] == cik]))
