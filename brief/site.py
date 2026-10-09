@@ -241,16 +241,18 @@ const f=document.forms.feed;
 if(f){const KEY='ib-filters';let saved={};try{saved=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(_){}
 for(const [k,v] of Object.entries(saved)){const el=f.elements[k];if(!el)continue;if(el.type==='checkbox')el.checked=v;else el.value=v}
 const rows=[...document.querySelectorAll('tr[data-side]')],days=[...document.querySelectorAll('tbody[data-day]')];
-const apply=()=>{const side=f.side.value,min=+f.min.value,np=f.noplan.checked,role=f.role.value,sig=f.sig.value,q=f.q.value.trim().toLowerCase();
+const inMove=(r,mv)=>{if(mv==='all')return true;if(r.dataset.mv==='')return false;const x=+r.dataset.mv;
+ return mv==='lt5'?x<5:mv==='5-10'?x>=5&&x<10:mv==='10-15'?x>=10&&x<15:x>=15};
+const apply=()=>{const side=f.side.value,min=+f.min.value,np=f.noplan.checked,role=f.role.value,sig=f.sig.value,mv=f.mv.value,q=f.q.value.trim().toLowerCase();
  let n=0;rows.forEach(r=>{const ok=(side==='all'||r.dataset.side===side)&&+r.dataset.value>=min&&!(np&&r.dataset.plan==='1')
-  &&(role==='all'||r.dataset.role.includes(role))&&(sig==='all'||r.dataset.sig.includes(sig))&&(!q||r.dataset.q.includes(q));r.hidden=!ok;if(ok)n++});
+  &&(role==='all'||r.dataset.role.includes(role))&&(sig==='all'||r.dataset.sig.includes(sig))&&inMove(r,mv)&&(!q||r.dataset.q.includes(q));r.hidden=!ok;if(ok)n++});
  days.forEach(d=>{d.hidden=![...d.querySelectorAll('tr[data-side]')].some(r=>!r.hidden)});
  document.getElementById('count').textContent=n===rows.length?`${n} trades`:`${n} of ${rows.length} trades`;
  document.getElementById('none').hidden=n>0;
- try{localStorage.setItem(KEY,JSON.stringify({side:f.side.value,min:f.min.value,noplan:f.noplan.checked,role:f.role.value,sig:f.sig.value}))}catch(_){}};
+ try{localStorage.setItem(KEY,JSON.stringify({side:f.side.value,min:f.min.value,noplan:f.noplan.checked,role:f.role.value,sig:f.sig.value,mv:f.mv.value}))}catch(_){}};
 f.addEventListener('input',apply);apply();
 document.querySelectorAll('button.show').forEach(b=>b.addEventListener('click',()=>{
- const want=JSON.parse(b.dataset.f);['side','role','sig','min'].forEach(k=>{f.elements[k].value=want[k]||(k==='min'?'0':'all')});
+ const want=JSON.parse(b.dataset.f);['side','role','sig','min','mv'].forEach(k=>{f.elements[k].value=want[k]||(k==='min'?'0':'all')});
  f.q.value='';apply();document.querySelector('table.feed').scrollIntoView({behavior:'smooth',block:'start'})}));}
 const built=+document.body.dataset.built;
 async function check(){try{const r=await fetch('STATUS?'+Date.now(),{cache:'no-store'});const s=await r.json();
@@ -478,7 +480,8 @@ def render_index(featured, cos, cfg, built_ts, window_days, clusters=None, intra
                                  if others else "")
         rows_by_day.setdefault(t["filing_date"], []).append(
             f"<tr class={'buy' if t['code']=='P' else 'sell'} data-side={t['code']} data-value={t['value']:.0f} "
-            f"data-plan={int(t['plan_10b5_1'])} data-role=\"{_role(t)}\" data-q=\"{e(q)}\" data-sig=\"{sig}\">"
+            f"data-plan={int(t['plan_10b5_1'])} data-role=\"{_role(t)}\" data-q=\"{e(q)}\" data-sig=\"{sig}\" "
+            f"data-mv=\"{'' if since is None else f'{since * 100:.3f}'}\">"
             f"<td class=tk><span class=tkl>{link}{report.save_button(src, co)}</span>"
             f"<span class=coname>{e(t['company'])}</span></td>"
             f"<td>{who}<br><span class=muted>{e(t['position'])}</span></td>"
@@ -501,6 +504,9 @@ def render_index(featured, cos, cfg, built_ts, window_days, clusters=None, intra
   <option value=500000>$500k</option><option value=1000000>$1M</option><option value=5000000>$5M</option></select></label>
  <label>Signal <select name=sig><option value=all>Any</option><option value=cluster>Cluster buys (7 days)</option>
   <option value=first>First buy in 1+ yr</option></select></label>
+ <label>Since trade <select name=mv><option value=all>Any move</option>
+  <option value=lt5>Under +5% (incl. falling)</option><option value=5-10>+5% to +10%</option>
+  <option value=10-15>+10% to +15%</option><option value=gt15>Over +15%</option></select></label>
  <label><input type=checkbox name=noplan> Hide 10b5-1 plan trades</label>
  <span id=count aria-live=polite></span>
 </form>
