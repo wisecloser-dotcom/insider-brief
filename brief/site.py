@@ -27,11 +27,10 @@ from .report import e, money, nice_date, pct, shares
 FEED = ("https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=4&company=&dateb="
         "&owner=include&start={start}&count=100&output=atom")
 SGT = timezone(timedelta(hours=8))
-CACHE_VERSION = 4   # bump to rebuild every cached company page after a logic change
+CACHE_VERSION = 5   # bump to rebuild every cached company page after a logic change
 
 
-def page_name(ticker: str) -> str:
-    return re.sub(r"[^A-Za-z0-9-]", "_", ticker or "unknown")
+page_name = report.page_name
 
 
 def warn(msg):
@@ -182,6 +181,61 @@ def enrich(ed: Edgar, cfg: Config, st: State, featured: list[dict], max_enrich: 
 
 
 # ---------------------------------------------------------------------------
+STAR_JS = r"""
+// Saved trades live in this browser's storage, so they survive closing the browser.
+const SKEY='ib-saved';
+window.ibLoad=()=>{try{return JSON.parse(localStorage.getItem(SKEY)||'{}')}catch(_){return {}}};
+window.ibStore=o=>{try{localStorage.setItem(SKEY,JSON.stringify(o));return true}catch(_){return false}};
+window.ibStars=()=>{const s=ibLoad();
+ document.querySelectorAll('[data-save]').forEach(b=>{const k=JSON.parse(b.dataset.save).k,on=!!s[k];
+  b.setAttribute('aria-pressed',String(on));
+  if(b.classList.contains('txt'))b.textContent=on?'Saved':'Save';else b.innerHTML=on?'&#9733;':'&#9734;';
+  b.title=on?'Saved. Click to remove':'Save this trade'});
+ const n=Object.keys(s).length;document.querySelectorAll('.savedn').forEach(x=>x.textContent=n?'('+n+')':'')};
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-save]');if(!b)return;
+ ev.preventDefault();const s=ibLoad(),d=JSON.parse(b.dataset.save);
+ if(s[d.k])delete s[d.k];else s[d.k]={...d,saved:new Date().toISOString(),note:''};
+ if(!ibStore(s))alert('This browser is blocking storage (private mode?), so trades can\'t be saved here.');
+ ibStars();if(window.ibRender)ibRender()});
+window.addEventListener('storage',()=>{ibStars();if(window.ibRender)ibRender()});
+ibStars();
+"""
+
+SAVED_JS = r"""
+(function(){
+const box=document.getElementById('saved');let P={prices:{},pages:[]};
+const money=v=>{const a=Math.abs(v);return a>=1e9?'$'+(v/1e9).toFixed(2)+'B':a>=1e6?'$'+(v/1e6).toFixed(2)+'M':a>=1e3?'$'+Math.round(v/1e3)+'k':'$'+v.toFixed(2)};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const day=d=>{if(!d)return '';const x=new Date(d.slice(0,10)+'T00:00:00Z');return x.getUTCDate()+' '+x.toLocaleString('en-GB',{month:'short',timeZone:'UTC'})+' '+x.getUTCFullYear()};
+window.ibRender=()=>{const s=ibLoad(),items=Object.values(s).sort((a,b)=>b.saved<a.saved?-1:1);
+ document.getElementById('savedcount').textContent=items.length;
+ if(!items.length){box.innerHTML='<div class=empty><h2>Nothing saved yet</h2><p>Click the &#9734; next to any trade on the front page, or <b>Save</b> on a company page, and it will be kept here, even after you close the browser.</p></div>';return}
+ box.innerHTML=items.map(x=>{const now=P.prices[x.tk],pg=P.pages.includes(x.tk);
+  const mv=now&&x.p?now[0]/x.p-1:null;
+  return '<article class="trade saved '+(x.s==='P'?'buy':'sell')+'"><header><span class=side>'+(x.s==='P'?'Buy':'Sell')+'</span>'+
+   '<h3>'+(pg?'<a href="'+esc(x.page)+'">'+esc(x.tk)+'</a>':esc(x.tk))+'</h3><p>'+esc(x.co)+'</p>'+
+   '<span class=hdr-r><a href="'+esc(x.url)+'">Form 4 on EDGAR</a><button type=button class="star txt" data-del="'+esc(x.k)+'">Remove</button></span></header>'+
+   '<dl><div><dt>Insider</dt><dd>'+esc(x.who)+'<br><span class=muted>'+esc(x.pos)+'</span></dd></div>'+
+   '<div><dt>Amount</dt><dd><b class=big>'+money(x.v)+'</b><br><span class=muted>at '+money(x.p)+'</span></dd></div>'+
+   '<div><dt>Traded / filed</dt><dd>'+day(x.td)+'<br><span class=muted>filed '+day(x.fd)+'</span></dd></div>'+
+   '<div><dt>Price since the trade</dt><dd>'+(mv===null?'<span class=muted>No recent price</span>':
+     '<b class="big '+(mv>=0?'up':'down')+'">'+(mv>=0?'+':'&minus;')+Math.abs(mv*100).toFixed(1)+'%</b><br><span class=muted>'+money(now[0])+' as of '+day(now[1])+'</span>')+'</dd></div>'+
+   '<div><dt>Saved</dt><dd>'+day(x.saved)+'</dd></div></dl>'+
+   '<label class=note><span>Your note</span><textarea rows=2 data-note="'+esc(x.k)+'" placeholder="Why you saved it, what to check next">'+esc(x.note)+'</textarea></label>'+
+   (pg?'':'<p class=flags>This company no longer has a page on the site (no insider trade in the last 7 days); the Form 4 link still works.</p>')+'</article>'}).join('')};
+box.addEventListener('click',ev=>{const b=ev.target.closest('[data-del]');if(!b)return;const s=ibLoad();delete s[b.dataset.del];ibStore(s);ibStars();ibRender()});
+box.addEventListener('input',ev=>{const t=ev.target.closest('[data-note]');if(!t)return;const s=ibLoad();if(s[t.dataset.note]){s[t.dataset.note].note=t.value;ibStore(s)}});
+document.getElementById('export').addEventListener('click',()=>{const a=document.createElement('a');
+ a.href=URL.createObjectURL(new Blob([JSON.stringify(ibLoad(),null,1)],{type:'application/json'}));
+ a.download='insider-saved-trades.json';a.click()});
+document.getElementById('import').addEventListener('change',ev=>{const f=ev.target.files[0];if(!f)return;
+ f.text().then(t=>{try{const add=JSON.parse(t),s=ibLoad();Object.assign(s,add);ibStore(s);ibStars();ibRender()}
+ catch(_){alert('That file isn\'t a saved-trades backup.')}})});
+ibRender();
+fetch('prices.json?'+Date.now(),{cache:'no-store'}).then(r=>r.json()).then(j=>{P=j;ibRender()}).catch(()=>{});
+})();
+"""
+
 JS_SITE = r"""
 const f=document.forms.feed;
 if(f){const KEY='ib-filters';let saved={};try{saved=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(_){}
@@ -243,27 +297,43 @@ border-left:1px solid var(--rule);padding:4px 11px;cursor:pointer}.ranges button
 table.feed .up{color:var(--buy);font-weight:600}table.feed .down{color:var(--sell);font-weight:600}
 @media (max-width:720px){#count{margin-left:0;width:100%}
  .strip{grid-template-columns:1fr 1fr}.sc:nth-child(3){border-left:0}.sc:nth-child(n+3){border-top:1px solid var(--rule)}
- .feed th:nth-child(2),.feed td:nth-child(2),.feed th:nth-child(8),.feed td:nth-child(8),
- .feed th:nth-child(9),.feed td:nth-child(9),.feed th:nth-child(10),.feed td:nth-child(10){display:none}}
-table.feed td:nth-child(9),table.feed td:nth-child(10){white-space:nowrap}
-@media (max-width:720px){
- /* phones: each trade becomes two lines: who and what / amount, stake, move since */
+}
+.wrap{max-width:1320px}
+.topnav{display:flex;gap:22px;justify-content:flex-end;font-size:14px;margin:-8px 0 10px}
+.topnav a{text-decoration:none;font-weight:600}.topnav a:hover{text-decoration:underline}
+.savedbar{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;margin:16px 0}.savedbar p{margin:0;flex:1;min-width:240px;color:var(--muted);font-size:14px}
+.filebtn{position:relative;overflow:hidden}.filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+article.saved h3 a{text-decoration-color:var(--rule)}
+.note{display:block;padding:8px 14px;border-top:1px solid var(--field);font-size:13px}.note span{display:block;color:var(--muted);margin-bottom:4px}
+.note textarea{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--paper);border:1px solid var(--rule);padding:6px 8px;resize:vertical}
+table.feed{table-layout:auto}
+table.feed .tkl{display:flex;align-items:center;gap:8px}table.feed .coname{display:block;font-size:13px;color:var(--muted);line-height:1.3;margin-top:2px}
+table.feed td:nth-child(1){min-width:150px;max-width:220px}table.feed td:nth-child(2){min-width:170px}
+table.feed td.dt{white-space:nowrap}table.feed td:nth-child(3){min-width:120px}
+@media (max-width:1100px){
+ /* narrower screens: each trade becomes a compact card, nothing scrolls sideways */
  table.feed,table.feed tbody{display:block}table.feed thead{display:none}
  tbody[data-day]>tr:first-child{display:block}tbody[data-day] th.day{display:block;padding-left:0}
- table.feed tr[data-side]{display:grid;grid-template-columns:auto 1fr auto;
-  grid-template-areas:"tk who side" "amt stake since";gap:6px 14px;padding:12px 0;border-bottom:1px solid var(--field)}
- table.feed tr[data-side]>td{border:0;padding:0;text-align:left}
- table.feed td:nth-child(1){grid-area:tk}table.feed td:nth-child(3){grid-area:who}
- table.feed td:nth-child(4){grid-area:side;text-align:right}table.feed td:nth-child(5){grid-area:amt}
- table.feed td:nth-child(6){grid-area:stake}table.feed td:nth-child(7){grid-area:since;text-align:right}
- table.feed td:nth-child(6)::before{content:"Stake ";font-size:12px;color:var(--muted);font-weight:400}
- table.feed td:nth-child(7)::before{content:"Since ";font-size:12px;color:var(--muted);font-weight:400}}
+ table.feed tr[data-side]{display:grid;grid-template-columns:minmax(120px,1fr) minmax(150px,1.4fr) auto;
+  grid-template-areas:"tk who side" "amt stake since" "held dt dt";gap:6px 16px;padding:12px 0;border-bottom:1px solid var(--field)}
+ table.feed tr[data-side]>td{border:0;padding:0;text-align:left;min-width:0;max-width:none}
+ table.feed tr[data-side]>td:nth-child(1){grid-area:tk}table.feed tr[data-side]>td:nth-child(2){grid-area:who}
+ table.feed tr[data-side]>td:nth-child(3){grid-area:side;text-align:right}table.feed tr[data-side]>td:nth-child(4){grid-area:amt}
+ table.feed tr[data-side]>td:nth-child(5){grid-area:stake}table.feed tr[data-side]>td:nth-child(6){grid-area:since;text-align:right}
+ table.feed tr[data-side]>td:nth-child(7){grid-area:held}table.feed tr[data-side]>td:nth-child(8){grid-area:dt;text-align:right}
+ table.feed tr[data-side]>td:nth-child(5)::before{content:"Stake ";font-size:12px;color:var(--muted);font-weight:400}
+ table.feed tr[data-side]>td:nth-child(7)::before{content:"Held after ";font-size:12px;color:var(--muted);font-weight:400}
+ table.feed td.dt br{display:none}table.feed td.dt a{margin-left:10px}}
+@media (max-width:560px){
+ table.feed tr[data-side]{grid-template-columns:1fr auto;grid-template-areas:"tk side" "who who" "amt since" "stake held" "dt dt"}
+ table.feed tr[data-side]>td:nth-child(7){text-align:right}table.feed tr[data-side]>td:nth-child(6) .spark{width:70px}}
 """
 
 
 def shell(title, subtitle, facts, body, built_ts, status_url, script=True, note="",
           compact=False) -> str:
     when = datetime.fromtimestamp(built_ts, SGT)
+    root = status_url[: -len("status.json")]
     facts_html = "".join(f"<div><dt>{k}</dt><dd>{v}</dd></div>" for k, v in facts)
     status = (f"Updated {when.day} {when:%b %Y, %H:%M} Singapore time. "
               f"Checks EDGAR every 30 minutes. {e(note)}")
@@ -279,6 +349,8 @@ def shell(title, subtitle, facts, body, built_ts, status_url, script=True, note=
 <body data-built="{int(built_ts)}">
 <div id=fresh hidden role=status>New filings have come in. <button onclick="location.reload()">Show them</button></div>
 <div class=wrap>
+<nav class=topnav aria-label="Site"><a href="{root}index.html" target=_self>Insider trades</a>
+ <a href="{root}saved.html" target=_self>Saved <span class=savedn></span></a></nav>
 {head}
 {body}
 <footer><p>* Disclosed public holdings = shares the person reported in their own SEC filings (this
@@ -286,7 +358,7 @@ company plus other public companies they file for), valued at today&rsquo;s pric
 not net worth: cash, property, private companies, options and unvested awards are not included.</p>
 <p>Sources: SEC EDGAR (Form 4, 8-K, shares outstanding), Yahoo Finance (prices), Google News
 (headlines). Charts by TradingView Lightweight Charts. Open-market buys and sells only. Information only, not investment advice.</p></footer>
-</div><script>{JS_SITE.replace('STATUS', status_url) if script else ''}</script></body></html>"""
+</div><script>{(STAR_JS + JS_SITE.replace('STATUS', status_url)) if script else ''}</script></body></html>"""
 
 
 def _role(t) -> str:
@@ -386,6 +458,7 @@ def render_index(featured, cos, cfg, built_ts, window_days, clusters=None, intra
         sig = " ".join(x for x, on in (("cluster", cl >= 2), ("first", bool(fb))) if on)
         tags = ((f"<br><span class='badge cl'>Cluster: {cl} buyers</span>" if cl >= 2 else "")
                 + (f"<br><span class='badge fb'>{e(fb)}</span>" if fb else "")
+                + (f"<br><span class=plan>{e(src['earnings_tag'])}</span>" if src.get("earnings_tag") else "")
                 + ("<br><span class=plan>10b5-1 plan</span>" if t["plan_10b5_1"] else "")
                 + (f"<br><span class=late>Filed {late} days late</span>" if late and late > 10 else ""))
         sc = src.get("stake_change")
@@ -406,15 +479,16 @@ def render_index(featured, cos, cfg, built_ts, window_days, clusters=None, intra
         rows_by_day.setdefault(t["filing_date"], []).append(
             f"<tr class={'buy' if t['code']=='P' else 'sell'} data-side={t['code']} data-value={t['value']:.0f} "
             f"data-plan={int(t['plan_10b5_1'])} data-role=\"{_role(t)}\" data-q=\"{e(q)}\" data-sig=\"{sig}\">"
-            f"<td class=tk>{link}</td><td>{e(t['company'])}</td>"
+            f"<td class=tk><span class=tkl>{link}{report.save_button(src, co)}</span>"
+            f"<span class=coname>{e(t['company'])}</span></td>"
             f"<td>{who}<br><span class=muted>{e(t['position'])}</span></td>"
             f"<td><span class=side>{t['side']}</span>{tags}</td>"
             f"<td class=n><b>{money(t['value'])}</b><br><span class=muted>{pct(mc) + ' of cap' if mc else 'cap n/a'}</span></td>"
             f"<td class=n>{stake}</td><td class=n>{since_html}</td>"
-            f"<td class=n>{held}</td><td>{nice_date(t['trade_date'])}</td>"
-            f"<td><a href=\"{e(t['url'])}\">Form 4</a></td></tr>")
+            f"<td class=n>{held}</td><td class=dt>{nice_date(t['trade_date'])}"
+            f"<br><a href=\"{e(t['url'])}\">Form 4</a></td></tr>")
     tbodies = "".join(
-        f"<tbody data-day=\"{d}\"><tr><th class=day colspan=10>Filed {nice_date(d)}</th></tr>{''.join(rs)}</tbody>"
+        f"<tbody data-day=\"{d}\"><tr><th class=day colspan=8>Filed {nice_date(d)}</th></tr>{''.join(rs)}</tbody>"
         for d, rs in rows_by_day.items())
     body = strip_html(info) + f"""
 <form name=feed class=filters aria-label="Filter trades" onsubmit="return false">
@@ -430,9 +504,9 @@ def render_index(featured, cos, cfg, built_ts, window_days, clusters=None, intra
  <label><input type=checkbox name=noplan> Hide 10b5-1 plan trades</label>
  <span id=count aria-live=polite></span>
 </form>
-<div class=scroll><table class=feed><thead><tr><th>Ticker</th><th>Company</th><th>Insider</th><th></th>
-<th class=n>Amount</th><th class=n>Stake</th><th class=n>Since trade</th><th class=n>Shares held after</th><th>Traded</th><th></th></tr></thead>
-{tbodies}</table></div>
+<table class=feed><thead><tr><th>Company</th><th>Insider</th><th></th>
+<th class=n>Amount</th><th class=n>Stake</th><th class=n>Since trade</th><th class=n>Held after</th><th>Traded</th></tr></thead>
+{tbodies}</table>
 <p id=none class=empty hidden>No trades match these filters. Clear one to see more.</p>
 {'' if featured else '<div class=empty><h2>No trades yet</h2><p>The first update is still collecting filings from EDGAR. Check back after the next run.</p></div>'}"""
     bought = sum(t["value"] for t in featured if t["code"] == "P")
@@ -555,6 +629,16 @@ def tv_block(co: dict) -> str:
             f'<script type=application/json id=pxdata>{data}</script>')
 
 
+def render_saved(built_ts) -> str:
+    body = (f'<div class=savedbar><p>Saved in this browser only. To move them to another device, '
+            f'download a backup here and load it there.</p>'
+            f'<button type=button id=export class="star txt">Download backup</button>'
+            f'<label class="star txt filebtn">Load backup<input type=file id=import accept=".json,application/json"></label></div>'
+            f'<div id=saved></div><script>{STAR_JS}{SAVED_JS}</script>')
+    return shell("Saved trades", "Your wishlist", [("Saved", "<span id=savedcount>0</span>")], body,
+                 built_ts, "status.json", script=False)
+
+
 def render_company(co, built_ts) -> str:
     section = report.company_section(co, "site")
     svg = report.chart_svg(co)
@@ -607,6 +691,21 @@ def build(ed: Edgar, cfg: Config, out: Path, window_days=7, max_enrich=40,
             except Exception as err:
                 warn(f"page for {co['ticker']} skipped: {err!r}")
     (tmp / "status.json").write_text(json.dumps({"built": int(built), "trades": len(featured)}))
+    (tmp / "saved.html").write_text(render_saved(built), encoding="utf-8")
+    pf = st.dir / "prices.json"
+    try:
+        known = json.loads(pf.read_text()) if pf.exists() else {}
+    except Exception:
+        known = {}
+    for co in cos.values():
+        if co.get("ticker") and co.get("price"):
+            known[co["ticker"]] = [co["price"], datetime.fromtimestamp(co.get("_built", built), SGT).strftime("%Y-%m-%d")]
+    for tk, bars in intraday.items():
+        if bars:
+            known[tk] = [bars[-1][1], bars[-1][0][:10]]
+    pf.write_text(json.dumps(known))
+    (tmp / "prices.json").write_text(json.dumps({"prices": known,
+        "pages": sorted(co["ticker"] for co in cos.values() if co.get("ticker"))}))
     (tmp / ".nojekyll").write_text("")
     shutil.rmtree(out, ignore_errors=True)
     tmp.replace(out)
@@ -633,3 +732,7 @@ def build_sample(out: Path):
     for co in cos.values():
         (out / "c" / f"{page_name(co['ticker'])}.html").write_text(render_company(co, built), encoding="utf-8")
     (out / "status.json").write_text(json.dumps({"built": int(built)}))
+    (out / "saved.html").write_text(render_saved(built), encoding="utf-8")
+    (out / "prices.json").write_text(json.dumps({
+        "prices": {c["ticker"]: [c["price"], "2026-10-08"] for c in cos.values()},
+        "pages": [c["ticker"] for c in cos.values()]}))

@@ -1,5 +1,6 @@
 """The HTML brief: one self-contained page, opens in any browser, no internet needed to view."""
 import html
+import json
 import re
 from datetime import date
 
@@ -58,6 +59,27 @@ def nice_date(s) -> str:
 
 
 # ---------------------------------------------------------------------------
+def page_name(ticker: str) -> str:
+    return re.sub(r"[^A-Za-z0-9-]", "_", ticker or "unknown")
+
+
+def save_payload(t: dict, co: dict | None) -> str:
+    """Snapshot stored when a trade is saved, so it still shows after it leaves the site."""
+    tk = t.get("ticker") or (co or {}).get("ticker") or ""
+    d = {"k": tkey(t), "tk": tk, "co": t.get("company") or (co or {}).get("name", ""),
+         "who": t.get("insider", ""), "pos": t.get("position", ""), "s": t["code"],
+         "v": round(float(t["value"]), 2), "td": (t.get("trade_date") or "")[:10],
+         "fd": (t.get("filing_date") or "")[:10], "p": round(float(t.get("chart_price") or t["price"]), 4),
+         "url": t.get("url", ""), "page": f"c/{page_name(tk)}.html#t={(t.get('trade_date') or '')[:10]}"}
+    return html.escape(json.dumps(d, separators=(",", ":")), quote=True)
+
+
+def save_button(t: dict, co: dict | None, text: bool = False) -> str:
+    cls = "star txt" if text else "star"
+    return (f'<button type=button class="{cls}" data-save="{save_payload(t, co)}" aria-pressed=false '
+            f'aria-label="Save this trade" title="Save this trade">{"Save" if text else "&#9734;"}</button>')
+
+
 def tkey(t: dict) -> str:
     """Stable id for one trade, shared by the chart markers and the rows they point to."""
     return re.sub(r"[^0-9A-Za-z]", "", str(t.get("accession", ""))) + str(t.get("code", ""))
@@ -129,6 +151,8 @@ def trade_block(t: dict, co: dict) -> str:
         f"<td class=n>{money(h['value']) if h['value'] else 'no price'}</td><td>{nice_date(h['as_of'])}</td></tr>"
         for h in w.get("holdings", []))
     flags = []
+    if t.get("earnings_tag"):
+        flags.append(t["earnings_tag"])
     if t.get("first_buy_label"):
         flags.append(t["first_buy_label"])
     if t.get("last_buy_note"):
@@ -158,11 +182,93 @@ def trade_block(t: dict, co: dict) -> str:
     return f"""
 <article id="tb-{tkey(t)}" class="trade {'buy' if buy else 'sell'}" data-side="{t['code']}" data-value="{t['value']:.0f}" data-plan="{int(t['plan_10b5_1'])}">
  <header><span class=side>{t['side']}</span><h3>{e(t['insider'])}</h3><p>{e(t['position'])}</p>
-  <a href="{e(t['url'])}">Form 4 on EDGAR</a></header>
+  <span class=hdr-r>{save_button(t, co, text=True)}<a href="{e(t['url'])}">Form 4 on EDGAR</a></span></header>
  <dl>{''.join(f'<div><dt>{k}</dt><dd>{v}</dd></div>' for k, v in fields)}</dl>
  {'<p class=flags>' + ' / '.join(e(f) for f in flags) + '</p>' if flags else ''}
+ {track_html(t)}
  {f'<details><summary>Where the holdings figure comes from</summary><table class=hold><tr><th>Company</th><th>Ticker</th><th class=n>Shares</th><th class=n>Value today</th><th>Latest filing</th></tr>{hold_rows}</table></details>' if hold_rows else ''}
 </article>"""
+
+
+def track_html(t: dict) -> str:
+    """The insider's earlier buys, collapsed until clicked."""
+    tr = t.get("track")
+    if not tr or t["code"] != "P":
+        return ""
+    if not tr["buys"]:
+        return ("<details class=track><summary>Their earlier buys</summary>"
+                "<p>No other open-market buys in their last 5 years of SEC filings.</p></details>")
+    head = f"{len(tr['buys'])} earlier buy{'s' if len(tr['buys']) != 1 else ''}"
+    summ = ""
+    if tr["n_done"]:
+        summ = (f"<p class=trsum>After 3 months, {tr['wins']} of {tr['n_done']} were up. "
+                f"Average {pct(tr['avg'], signed=True)}"
+                + (f", {pct(tr['avg_vs_spy'], signed=True)} vs the S&amp;P 500" if tr["avg_vs_spy"] is not None else "")
+                + ".</p>")
+    rows = "".join(
+        f"<tr><td>{nice_date(b['date'])}</td><td>{e(b['ticker'] or '')}</td><td>{e(b['company'])}</td>"
+        f"<td class=n>{money(b['price'])}</td>"
+        f"<td class=n>{'n/a' if b['ret'] is None else ('<span class=' + ('up' if b['ret'] >= 0 else 'down') + '>' + pct(b['ret'], signed=True) + '</span>' + ('' if b['complete'] else ' <span class=muted>so far</span>'))}</td>"
+        f"<td class=n>{'n/a' if b['spy'] is None else pct(b['spy'], signed=True)}</td></tr>"
+        for b in tr["buys"])
+    return (f"<details class=track><summary>Their earlier buys: {head}</summary>{summ}"
+            f"<table class=hold><tr><th>Bought</th><th>Ticker</th><th>Company</th><th class=n>Paid</th>"
+            f"<th class=n>3 months later</th><th class=n>S&amp;P 500 same period</th></tr>{rows}</table>"
+            f"<p class=muted>Uses closing prices 63 trading days after each buy. \"So far\" means "
+            f"3 months haven't passed yet. n/a means no usable price history (often delisted).</p></details>")
+
+
+def range_panel(co: dict) -> str:
+    """52-week low/high bar shown beside the chart, with today's price and recent insider prices."""
+    o = co.get("ohlc")
+    if o and len(o.get("t", [])) >= 20:
+        lo, hi, label = min(o["l"][-252:]), max(o["h"][-252:]), "52-week range"
+    elif co.get("chart") and co["chart"].get("close"):
+        lo, hi, label = min(co["chart"]["close"]), max(co["chart"]["close"]), "6-month range"
+    else:
+        return ""
+    p = co.get("price")
+    if not p or hi <= lo:
+        return ""
+    pos = lambda v: max(0.0, min(1.0, (v - lo) / (hi - lo)))
+    where = pos(p)
+    word = ("Near the 52-week low" if where <= 0.15 else "Near the 52-week high" if where >= 0.85
+            else "Lower half of the range" if where < 0.5 else "Upper half of the range")
+    if label != "52-week range":
+        word = word.replace("52-week", "6-month")
+    ticks = "".join(
+        f'<i class="tick {"buy" if t["code"] == "P" else "sell"}" style="bottom:{pos(t["chart_price"]) * 100:.1f}%" '
+        f'title="{e(t["insider"])} {t["side"].lower()} at {money(t["chart_price"])}"></i>'
+        for t in co["trades"] if t.get("headline") and t.get("chart_price"))
+    return f"""<aside class=r52 aria-label="{label}">
+ <h4>{label}</h4><p class=r52w>{word}</p><p class=r52p>Now {money(p)} <span class=muted>(black line)</span></p>
+ <div class=r52body><div class=r52bar><b class=r52now style="bottom:{where * 100:.1f}%"></b>{ticks}</div>
+  <div class=r52lab><span>{money(hi)}<br><small>high</small></span>
+   <span>{money(lo)}<br><small>low</small></span></div></div>
+ <p class=muted>{pct(p / lo - 1)} above the low, {pct(1 - p / hi)} below the high.
+ {'Ticks mark this week&rsquo;s insider prices.' if ticks else ''}</p>
+</aside>"""
+
+
+def mixed_note(co: dict, days: int = 30) -> str:
+    """Flag when some insiders are selling while others are buying."""
+    from datetime import date as _d, timedelta as _td
+    cut = str(_d.today() - _td(days=days))
+    recent = [t for t in co["trades"] if (t.get("trade_date") or "") >= cut]
+    buyers = {t["insider_cik"] for t in recent if t["code"] == "P"}
+    sells = [t for t in recent if t["code"] == "S"]
+    sellers = {t["insider_cik"] for t in sells}
+    if not buyers or not sellers:
+        return ""
+    sold = sum(t["value"] for t in sells)
+    plan = sum(t["value"] for t in sells if t["plan_10b5_1"])
+    bought = sum(t["value"] for t in recent if t["code"] == "P")
+    names = list(dict.fromkeys(t["insider"] for t in sells))
+    return (f"<p class='callout mixed'><b>Mixed signals:</b> {len(sellers)} insider{'s' if len(sellers) > 1 else ''} "
+            f"sold {money(sold)} in the last {days} days"
+            + (f" ({money(plan)} on pre-arranged 10b5-1 plans)" if plan else "")
+            + f" while {len(buyers)} bought {money(bought)}. Sellers: {', '.join(e(n) for n in names[:4])}"
+            + (" and others" if len(names) > 4 else "") + ".</p>")
 
 
 def related_table(co: dict) -> str:
@@ -180,7 +286,7 @@ def related_table(co: dict) -> str:
         f"<tr id=\"tr-{tkey(t)}\" class=\"{'hl ' if t['headline'] else ''}{'buy' if t['code']=='P' else 'sell'}\" data-side=\"{t['code']}\" data-value=\"{t['value']:.0f}\" data-plan=\"{int(t['plan_10b5_1'])}\">"
         f"<td>{nice_date(t['trade_date'])}</td><td>{e(t['insider'])}</td><td>{e(t['position'])}</td>"
         f"<td><span class=side>{t['side']}</span></td><td class=n>{money(t['value'])}</td>"
-        f"<td class=n>{shares(t['held_after'])}</td><td>{'Yes' if t['plan_10b5_1'] else ''}</td>"
+        f"<td class=n data-l='Held after'>{shares(t['held_after'])}</td><td>{'10b5-1 plan' if t['plan_10b5_1'] else ''}</td>"
         f"<td><a href=\"{e(t['url'])}\">Filing</a></td></tr>" for t in tr)
     return (f"<p class=summ>{summ}</p><div class=scroll><table class=rel><tr><th>Traded</th><th>Insider</th>"
             f"<th>Position</th><th></th><th class=n>Amount</th><th class=n>Shares held after</th>"
@@ -218,8 +324,8 @@ def company_section(co: dict, mode: str) -> str:
   <p class=muted>{e(co['industry'])}{' / ' + e(co['exchange']) if co['exchange'] else ''} /
   <a href="{e(co['edgar_url'])}">All insider filings on EDGAR</a></p></div>
   <dl class=facts>{''.join(f'<div><dt>{k}</dt><dd>{v}</dd></div>' for k, v in facts)}</dl></div>
- {cluster_note(co)}
- {chart_svg(co)}
+ {cluster_note(co)}{mixed_note(co)}
+ <div class=chartrow><div class=chartmain>{chart_svg(co)}</div>{range_panel(co)}</div>
  <h4>{title}</h4>{''.join(trade_block(t, co) for t in head)}
  <h4>Everyone trading {e(co['ticker'])} in the last 90 days</h4>{related_table(co)}
  {news_block(co)}
@@ -317,6 +423,38 @@ h4{font-size:15px;margin:26px 0 8px;font-weight:700}
 .flash,tr.flash td{animation:flash 2.6s ease-out;outline:2px solid var(--mark);outline-offset:2px}
 @keyframes flash{0%,35%{background-color:color-mix(in srgb,var(--mark) 70%,transparent)}100%{background-color:transparent}}
 @media (prefers-reduced-motion:reduce){.flash,tr.flash td{animation:none;background-color:color-mix(in srgb,var(--mark) 40%,transparent)}}
+.chartrow{display:grid;grid-template-columns:minmax(0,1fr) 170px;gap:18px;align-items:stretch;margin-top:18px}
+.chartrow .chart,.chartrow .tvbox{margin-top:0}
+.r52{border:1px solid var(--rule);background:var(--sheet);padding:12px 14px;display:flex;flex-direction:column}
+.r52 h4{margin:0;font-size:12px;font-weight:600;color:var(--muted)}.r52w{margin:2px 0 2px;font-weight:700}.r52p{margin:0 0 12px;font-size:13px}
+.r52body{flex:1;display:grid;grid-template-columns:14px 1fr;gap:10px;min-height:200px}
+.r52bar{position:relative;background:linear-gradient(to top,var(--sell-bg),var(--field) 50%,var(--buy-bg));border:1px solid var(--rule)}
+.r52now{position:absolute;left:-5px;right:-5px;height:4px;margin-bottom:-2px;background:var(--ink)}
+.tick{position:absolute;left:-3px;width:8px;height:8px;margin-bottom:-4px;border-radius:50%;border:2px solid var(--sheet)}
+.tick.buy{background:var(--buy)}.tick.sell{background:var(--sell);left:auto;right:-3px}
+.r52lab{position:relative;display:flex;flex-direction:column;justify-content:space-between;font-size:13px;font-weight:600}
+.r52lab small{font-weight:400;color:var(--muted)}
+.r52cur{position:absolute;left:0;transform:translateY(50%);background:var(--sheet);padding:2px 0}
+.r52 .muted{font-size:12px;margin:10px 0 0}
+.callout.mixed{background:color-mix(in srgb,var(--sell-bg) 80%,transparent);border-left-color:var(--sell)}
+details.track{border-top:1px solid var(--field);padding:8px 14px;font-size:14px}
+details.track[open] summary{margin-bottom:6px}.trsum{margin:4px 0 6px;font-weight:600}
+.hdr-r{margin-left:auto;display:flex;gap:16px;align-items:baseline}
+.star{font:inherit;cursor:pointer;background:none;border:1px solid var(--rule);color:var(--muted);
+padding:0 7px;line-height:1.5;font-size:15px}.star[aria-pressed=true]{color:#B8860B;border-color:#B8860B}
+.star.txt{font-size:13px;padding:1px 10px}
+@media (prefers-color-scheme:dark){.star[aria-pressed=true]{color:var(--mark-ink,#F6E35A);border-color:currentColor}}
+@media (max-width:900px){.chartrow{grid-template-columns:1fr}.r52body{min-height:150px}}
+@media (max-width:560px){table.hold{font-size:12px}table.hold th,table.hold td{padding:5px 4px}
+ details.track table.hold th:nth-child(3),details.track table.hold td:nth-child(3),
+ details:not(.track) table.hold th:nth-child(5),details:not(.track) table.hold td:nth-child(5){display:none}
+ table.hold td{overflow-wrap:anywhere}table.hold .n{white-space:normal}}
+@media (max-width:720px){article header .hdr-r{margin-left:0;width:100%}
+ table.rel,table.rel tbody{display:block}table.rel tr:first-child{display:none}
+ table.rel tr[id]{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:10px 0;border-bottom:1px solid var(--field)}
+ table.rel tr[id] td{border:0;padding:0;text-align:left}
+ table.rel td:nth-child(5),table.rel td:nth-child(4){text-align:right}
+ table.rel td:nth-child(6)::before{content:attr(data-l) " ";color:var(--muted);font-size:12px}}
 .m.buy{fill:var(--buy)}.m.sell{fill:var(--sell)}.m.hl{stroke:var(--mark);stroke-width:3;paint-order:stroke}
 .legend{font-size:12px;color:var(--muted);margin:4px 0 0}
 .k{display:inline-block;width:10px;height:10px;margin:0 6px 0 14px;vertical-align:-1px}

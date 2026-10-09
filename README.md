@@ -37,6 +37,13 @@ over the next run or two.
 To change the filters, edit the `python -m brief site ...` line in
 `.github/workflows/update.yml`, e.g. add `--min-buy 50000 --min-sell 1000000 --window-days 14`.
 
+## Saved trades (wishlist)
+
+Click the star next to any trade (or **Save** on a company page) to keep it on the **Saved** page,
+with your own note. Saves live in your browser's storage, so they survive closing the browser,
+but they're per browser and device. Use **Download backup** / **Load backup** on the Saved page
+to move them to another device.
+
 ## Run it on your own computer (optional)
 
 ```

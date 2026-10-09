@@ -36,6 +36,63 @@ def insider_wealth(ed: Edgar, cfg: Config, t: dict, price_now: float | None, cac
             "trade_vs_holdings": (t["value"] / before) if before and before > 0 else None}
 
 
+_PX: dict = {}   # price histories fetched during this run, shared across companies
+
+
+def px_hist(ticker: str):
+    if ticker and ticker not in _PX:
+        _PX[ticker] = market.history(ticker, months=61)
+    return _PX.get(ticker)
+
+
+def track_record(ed: Edgar, t: dict, horizon: int = 63, max_buys: int = 8) -> dict:
+    """This person's earlier open-market buys (any company, last 5 years) and how each did
+    over the next ~3 months (63 trading days), next to the S&P 500 (SPY) over the same days."""
+    buys = ed.owner_buys(t["insider_cik"], t["trade_date"])[:max_buys]
+    spy = px_hist("SPY")
+    rows = []
+    for b in buys:
+        r = {**b, "ret": None, "spy": None, "complete": False}
+        px = px_hist(b["ticker"]) if b["ticker"] else None
+        if px is not None and len(px):
+            i = int(px.index.searchsorted(pd.Timestamp(b["date"])))
+            if i < len(px):
+                entry = market.to_chart_scale(px, b["date"], b["price"])
+                c0 = float(px["close"].iloc[i])
+                if entry and c0 and abs(entry / c0 - 1) < 0.5:   # else the ticker/price data don't match
+                    j = min(i + horizon, len(px) - 1)
+                    r["complete"] = i + horizon < len(px)
+                    r["ret"] = float(px["close"].iloc[j] / entry - 1)
+                    r["exit_date"] = str(px.index[j].date())
+                    if spy is not None and len(spy):
+                        si = int(spy.index.searchsorted(px.index[i]))
+                        sj = int(spy.index.searchsorted(px.index[j]))
+                        if sj < len(spy) and si < len(spy):
+                            r["spy"] = float(spy["close"].iloc[sj] / spy["close"].iloc[si] - 1)
+        rows.append(r)
+    done = [r for r in rows if r["complete"] and r["ret"] is not None]
+    vs = [r["ret"] - r["spy"] for r in done if r["spy"] is not None]
+    return {"buys": rows, "n_done": len(done),
+            "avg": sum(r["ret"] for r in done) / len(done) if done else None,
+            "avg_vs_spy": sum(vs) / len(vs) if vs else None,
+            "wins": sum(1 for r in done if r["ret"] > 0)}
+
+
+def earnings_tag(trade_date: str | None, earnings: list[str]) -> tuple[int | None, str | None]:
+    """How long after the company's last earnings report (8-K item 2.02) the trade happened."""
+    if not trade_date:
+        return None, None
+    prior = [d for d in earnings if d <= trade_date[:10]]
+    if not prior:
+        return None, None
+    d = (date.fromisoformat(trade_date[:10]) - date.fromisoformat(max(prior))).days
+    if d == 0:
+        return 0, "On earnings day"
+    if d <= 10:
+        return d, f"{d} day{'s' if d > 1 else ''} after earnings"
+    return d, f"Mid-quarter, {d} days after earnings"
+
+
 CLUSTER_DAYS = 7   # 2+ different insiders buying the same stock within this many days
 
 
@@ -102,8 +159,11 @@ def company(ed: Edgar, cfg: Config, cik, ticker: str, name: str,
     merged = related + [t for t in headline if _key(t) not in seen]
     related = form4.dedupe_joint(sorted(merged, key=lambda t: _key(t) not in head_keys))
 
+    eight_ks = ed.eight_ks(cik, since)
+    earnings = sorted(k["date"] for k in eight_ks if "Earnings results" in k["what"])
     price_cache = {}
     for t in related:
+        t["earnings_days"], t["earnings_tag"] = earnings_tag(t.get("trade_date"), earnings)
         t["headline"] = _key(t) in head_keys
         t["pct_mcap"] = t["value"] / mcap if mcap else None
         t["pct_adv"] = t["value"] / s["adv"] if s["adv"] else None
@@ -125,6 +185,7 @@ def company(ed: Edgar, cfg: Config, cik, ticker: str, name: str,
             if t["code"] == "P" and t.get("insider_cik") and t.get("trade_date"):
                 h = ed.owner_buy_history(t["insider_cik"], cik, t["trade_date"], t["filing_date"])
                 t["first_buy_label"], t["last_buy_note"] = first_buy_label(h, t["trade_date"])
+                t["track"] = track_record(ed, t)
 
     df = pd.DataFrame(related, columns=["code", "insider_cik", "value", "plan_10b5_1"]
                       if not related else None)
@@ -150,7 +211,7 @@ def company(ed: Edgar, cfg: Config, cik, ticker: str, name: str,
         "market_cap": mcap, "shares_out": shares_out,
         "trades": sorted(related, key=lambda t: (t["trade_date"] or "", t["filing_date"]), reverse=True),
         "totals": totals, "chart": chart, "cluster": cluster(related), "ohlc": market.ohlc(px),
-        "eight_ks": ed.eight_ks(cik, since),
+        "eight_ks": eight_ks,
         "news": news.headlines(sub.get("name") or name, ticker, cfg.lookback_days, cfg.news_items),
         "edgar_url": f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={int(cik)}&type=4&owner=only",
     }

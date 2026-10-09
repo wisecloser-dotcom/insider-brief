@@ -223,3 +223,27 @@ def test_spark_and_chart_data():
     assert block.count("</script>") == 1
     page = site.render_company(co, 0)
     assert "lightweight-charts.js" in page and "id=svgchart" in page
+
+
+def test_track_record_and_panels(monkeypatch):
+    import pandas as pd
+    from brief import brief as b, market, report, sample
+    days = pd.bdate_range("2025-01-01", periods=200)
+    px = pd.DataFrame({"open": 10.0, "high": 10.0, "low": 10.0, "close": [10.0 + i * 0.05 for i in range(200)],
+                       "volume": 1e6, "split_after": 1.0}, index=days)
+    b._PX.clear()
+    monkeypatch.setattr(market, "history", lambda t, months=61: px)
+    class Ed:
+        def owner_buys(self, cik, before):
+            return [{"issuer_cik": "1", "company": "A", "ticker": "AAA", "date": str(days[10].date()), "shares": 1, "price": 10.5},
+                    {"issuer_cik": "1", "company": "A", "ticker": "AAA", "date": str(days[180].date()), "shares": 1, "price": 19.0}]
+    tr = b.track_record(Ed(), {"insider_cik": "9", "trade_date": "2026-01-01"})
+    first, recent = tr["buys"]
+    assert first["complete"] and abs(first["ret"] - (px.close.iloc[73] / 10.5 - 1)) < 1e-9
+    assert not recent["complete"] and recent["ret"] is not None   # under 3 months: "so far"
+    assert tr["n_done"] == 1 and tr["wins"] == 1 and first["spy"] is not None
+    co = sample.companies()[0]
+    assert "Mixed signals" in report.mixed_note(co)
+    assert "52-week range" in report.range_panel(co) or "6-month range" in report.range_panel(co)
+    assert "Their earlier buys: 3 earlier buys" in report.trade_block(co["trades"][0], co)
+    assert 'data-save="' in report.save_button(co["trades"][0], co)

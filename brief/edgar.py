@@ -181,6 +181,37 @@ class Edgar:
                 break   # newest first: the first hit is the most recent earlier buy
         return out
 
+    def owner_buys(self, owner_cik, before: str, years: int = 5, max_filings: int = 150) -> list[dict]:
+        """Every open-market buy this person reported (any company) in the `years` before a date.
+        One entry per filing and company: total shares, average price, first trade date."""
+        try:
+            df = self.recent_filings(owner_cik)
+        except Exception:
+            return []
+        lo = pd.Timestamp(before) - pd.DateOffset(years=years)
+        df = df[df["form"].isin(["4", "4/A", "5", "5/A"]) & (df["filingDate"] >= lo)]
+        out, seen = [], set()
+        for r in df.head(max_filings).itertuples():
+            try:
+                f = self.filing(owner_cik, r.accessionNumber)
+            except Exception:
+                continue
+            if not f:
+                continue
+            lines = [x for x in f["rows"] if x["kind"] == "trade" and x["code"] == "P"
+                     and x["shares"] and x["price"] and x.get("date") and x["date"] < before]
+            if not lines:
+                continue
+            day = min(x["date"] for x in lines)
+            key = (f["issuer_cik"], day)
+            if key in seen:      # amendments and joint filings repeat the same buy
+                continue
+            seen.add(key)
+            sh = sum(x["shares"] for x in lines)
+            out.append({"issuer_cik": f["issuer_cik"], "company": f["issuer_name"], "ticker": f["ticker"],
+                        "date": day, "shares": sh, "price": sum(x["shares"] * x["price"] for x in lines) / sh})
+        return sorted(out, key=lambda x: x["date"], reverse=True)
+
     def eight_ks(self, cik, since: date) -> list[dict]:
         df = self.recent_filings(cik)
         df = df[df["form"].isin(["8-K", "8-K/A"]) & (df["filingDate"] >= pd.Timestamp(since))]

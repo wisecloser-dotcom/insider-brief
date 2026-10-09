@@ -20,15 +20,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 55
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
 
       # filings never change once filed, so keep the download cache between runs
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6
         with:
           path: data
           key: data-${{ github.run_id }}
@@ -43,13 +43,13 @@ jobs:
         if: always()
         run: find data/cache -type f -mtime +120 -delete 2>/dev/null || true
 
-      - uses: actions/cache/save@v4
+      - uses: actions/cache/save@v6
         if: always()
         with:
           path: data
           key: data-${{ github.run_id }}
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
@@ -61,4 +61,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

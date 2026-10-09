@@ -71,6 +71,7 @@ def companies():
             tr = [_trade(co, days, close, 124, "Rivera Elena M.", "Chief Executive Officer, Director", "P", 60_000, 1_840_000, headline=True, cik="11"),
                   _trade(co, days, close, 123, "Okafor Daniel", "Chief Financial Officer", "P", 12_000, 95_000, headline=True, cik="12"),
                   _trade(co, days, close, 101, "Lindqvist Petra", "Director", "P", 25_000, 410_000, cik="13"),
+                  _trade(co, days, close, 118, "Patel Anika", "General Counsel", "S", 9_000, 40_000, cik="15"),
                   _trade(co, days, close, 40, "Chen Marcus", "Chief Medical Officer", "S", 8_000, 66_000, plan=True, cik="14")]
             tr[0]["wealth"] = {"total_after": 61_500_000, "trade_vs_holdings": 0.019, "holdings": [
                 {"company": name, "ticker": tk, "shares": 1_840_000, "value": 1_840_000 * co["price"], "as_of": tr[0]["filing_date"], "price": co["price"]},
@@ -102,6 +103,12 @@ def companies():
         if n == 0:
             tr[0]["first_buy_label"], tr[0]["last_buy_note"] = "First buy in 4 yrs", "Last open-market buy here: Mar 2022"
             tr[1]["first_buy_label"], tr[1]["last_buy_note"] = "New insider, first buy", "First SEC filing as an insider: Jul 2026"
+            tr[0]["earnings_tag"], tr[1]["earnings_tag"] = "Mid-quarter, 55 days after earnings", "Mid-quarter, 54 days after earnings"
+            tr[0]["track"] = {"n_done": 3, "wins": 2, "avg": 0.094, "avg_vs_spy": 0.061, "buys": [
+                {"date": "2022-03-14", "ticker": "NWTX", "company": name, "price": 21.4, "ret": 0.18, "spy": 0.04, "complete": True},
+                {"date": "2021-05-03", "ticker": "MBLX", "company": "Meridian Bio Labs Inc", "price": 38.2, "ret": -0.04, "spy": 0.02, "complete": True},
+                {"date": "2019-11-20", "ticker": "NWTX", "company": name, "price": 9.85, "ret": 0.14, "spy": 0.04, "complete": True}]}
+            tr[1]["track"] = {"n_done": 0, "wins": 0, "avg": None, "avg_vs_spy": None, "buys": []}
         from .brief import cluster
         co["cluster"] = cluster(tr, today=days[-1].date())
         b = [t for t in tr if t["code"] == "P"]
