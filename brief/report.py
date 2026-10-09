@@ -47,9 +47,12 @@ def shares(v) -> str:
 
 
 def nice_date(s) -> str:
-    if not s:
+    try:
+        t = pd.Timestamp(str(s)[:10])
+    except Exception:
         return "n/a"
-    t = pd.Timestamp(s)
+    if pd.isna(t):
+        return "n/a"
     return f"{t.day} {t:%b %Y}"
 
 
@@ -61,7 +64,8 @@ def chart_svg(co: dict) -> str:
     W, H, L, R, T, B = 760, 250, 52, 20, 14, 28
     dates = pd.to_datetime(ch["dates"])
     y = np.array(ch["close"])
-    marks = [t for t in co["trades"] if t["trade_date"] and pd.Timestamp(t["trade_date"]) >= dates[0]]
+    marks = [t for t in co["trades"] if t.get("trade_date") and t.get("chart_price")
+             and pd.Timestamp(str(t["trade_date"])[:10]) >= dates[0]]
     lo = min([y.min()] + [t["chart_price"] for t in marks])
     hi = max([y.max()] + [t["chart_price"] for t in marks])
     pad = (hi - lo) * 0.08 or hi * 0.05
@@ -82,7 +86,7 @@ def chart_svg(co: dict) -> str:
                               f'<text x="{X(i):.1f}" y="{H-8}" text-anchor=middle>{d:%b}</text>')
     dots = []
     for t in sorted(marks, key=lambda t: t["headline"]):  # headline trades drawn on top
-        i = min(int(dates.searchsorted(pd.Timestamp(t["trade_date"]))), len(y) - 1)
+        i = min(int(dates.searchsorted(pd.Timestamp(str(t["trade_date"])[:10]))), len(y) - 1)
         x, yy = X(i), Y(t["chart_price"])
         r = 7 if t["headline"] else 5
         if t["code"] == "P":

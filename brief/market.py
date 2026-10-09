@@ -54,7 +54,7 @@ def to_chart_scale(px: pd.DataFrame | None, trade_date: str | None, price: float
     """A price filed before a later split, divided down to today's share basis."""
     if px is None or not trade_date:
         return price
-    pos = px.index.searchsorted(pd.Timestamp(trade_date))
+    pos = px.index.searchsorted(pd.Timestamp(str(trade_date)[:10]))
     if pos >= len(px):
         return price
     return price / px["split_after"].iloc[pos]

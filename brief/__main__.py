@@ -49,7 +49,15 @@ def main(argv=None):
             from .edgar import Edgar
             from .sec import SecClient
             ed = Edgar(SecClient(cfg.sec_user_agent, cfg.cache_dir, cfg.sec_max_rps))
-            site.build(ed, cfg, out, a.window_days, a.max_enrich)
+            try:
+                site.build(ed, cfg, out, a.window_days, a.max_enrich)
+            except Exception:
+                import traceback
+                tb = traceback.format_exc()
+                print(tb)
+                # an ::error:: line becomes an annotation on the run page, readable without logs
+                print("::error title=Site build failed::" + tb.replace("%", "%25").replace("\n", "%0A"))
+                raise
         print(f"Site in {out}/index.html")
         return
 

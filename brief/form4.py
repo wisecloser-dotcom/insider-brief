@@ -28,6 +28,12 @@ def _num(x):
         return None
 
 
+def _date(x):
+    """Dates can carry a timezone ("2026-10-06-05:00", "2026-10-06Z"); keep YYYY-MM-DD."""
+    m = re.match(r"\d{4}-\d{2}-\d{2}", x or "")
+    return m.group(0) if m else None
+
+
 def _flag(x) -> bool:
     return (x or "").strip().lower() in ("1", "true", "y", "yes")
 
@@ -74,7 +80,7 @@ def parse(xml_bytes: bytes) -> dict:
             rows.append({
                 "kind": kind,
                 "security": _v(t, "securityTitle") or "",
-                "date": _v(t, "transactionDate"),
+                "date": _date(_v(t, "transactionDate")),
                 "code": _v(t, "transactionCoding/transactionCode"),
                 "shares": _num(_v(t, "transactionAmounts/transactionShares")),
                 "price": _num(_v(t, "transactionAmounts/transactionPricePerShare")),
@@ -84,7 +90,7 @@ def parse(xml_bytes: bytes) -> dict:
             })
     return {
         "form": _v(root, "documentType"),
-        "period": _v(root, "periodOfReport"),
+        "period": _date(_v(root, "periodOfReport")),
         "issuer_cik": (_v(issuer, "issuerCik") or "").lstrip("0"),
         "issuer_name": _v(issuer, "issuerName") or "",
         "ticker": (_v(issuer, "issuerTradingSymbol") or "").upper().strip(),

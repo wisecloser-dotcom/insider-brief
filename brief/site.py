@@ -29,12 +29,19 @@ FEED = ("https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=4&compa
 SGT = timezone(timedelta(hours=8))
 
 
+def warn(msg):
+    """Shows up as a warning on the GitHub Actions run page."""
+    print(f"::warning::{msg}")
+
+
 # ---------------------------------------------------------------------------
 class State:
     def __init__(self, cfg: Config):
         self.dir = cfg.data_dir / "state"
         (self.dir / "companies").mkdir(parents=True, exist_ok=True)
         self.trades = self._load("trades.json", [])
+        for t in self.trades:   # older runs may have stored dates with a timezone suffix
+            t["trade_date"] = form4._date(t.get("trade_date"))
         self.seen = self._load("seen.json", {})          # accession -> filing date
         self.days_done = set(self._load("days_done.json", []))
 
@@ -155,6 +162,7 @@ def enrich(ed: Edgar, cfg: Config, st: State, featured: list[dict], max_enrich: 
         if cached:
             # trades that left the 7-day window are no longer headline trades
             for t in cached["trades"]:
+                t["trade_date"] = form4._date(t.get("trade_date"))
                 t["headline"] = _key(t) in want
             out[cik] = cached
     log(f"  enriched {done} companies this run, {len(out)} ready, "
@@ -314,7 +322,10 @@ def build(ed: Edgar, cfg: Config, out: Path, window_days=7, max_enrich=40,
     (tmp / "index.html").write_text(render_index(featured, cos, cfg, built, window_days), encoding="utf-8")
     for co in cos.values():
         if co.get("ticker"):
-            (tmp / "c" / f"{co['ticker']}.html").write_text(render_company(co, built), encoding="utf-8")
+            try:   # one odd filing must never take the whole site down
+                (tmp / "c" / f"{co['ticker']}.html").write_text(render_company(co, built), encoding="utf-8")
+            except Exception as err:
+                warn(f"page for {co['ticker']} skipped: {err!r}")
     (tmp / "status.json").write_text(json.dumps({"built": int(built), "trades": len(featured)}))
     (tmp / ".nojekyll").write_text("")
     shutil.rmtree(out, ignore_errors=True)
