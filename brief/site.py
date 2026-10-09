@@ -335,6 +335,7 @@ table.feed td.dt{white-space:nowrap}table.feed td:nth-child(3){min-width:120px}
 def edgar_new_tab(html: str) -> str:
     """SEC EDGAR links and news headlines open in a new tab; everything else stays in the same tab."""
     html = re.sub(r'<a href="(https://www\.sec\.gov[^"]*)"', r'<a href="\1" target=_blank rel=noopener', html)
+    html = html.replace('<a class=extlink ', '<a class=extlink target=_blank rel=noopener ')
     return html.replace('<a class=newslink ', '<a class=newslink target=_blank rel=noopener ')
 
 

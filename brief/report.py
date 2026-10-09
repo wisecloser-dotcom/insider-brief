@@ -317,6 +317,18 @@ def cluster_note(co: dict) -> str:
     return out
 
 
+def ext_links(co: dict) -> str:
+    """Quick links to the stock on Yahoo Finance and to live posts about it on X."""
+    tk = co.get("ticker")
+    if not tk:
+        return ""
+    from urllib.parse import quote
+    yahoo = f"https://finance.yahoo.com/quote/{quote(tk)}"
+    x = f"https://x.com/search?q={quote('$' + tk.replace('-', '.'))}&f=live"
+    return (f"<p class=ext><a class=extlink href=\"{e(yahoo)}\">Yahoo Finance</a>"
+            f"<a class=extlink href=\"{e(x)}\">${e(tk.replace('-', '.'))} on X</a></p>")
+
+
 def company_section(co: dict, mode: str) -> str:
     head = [t for t in co["trades"] if t["headline"]]
     facts = [("Price", money(co["price"])), ("6-month change", pct(co["chg_6m"], signed=True)),
@@ -327,7 +339,7 @@ def company_section(co: dict, mode: str) -> str:
 <section class=co id="co-{e(co['ticker'] or co['cik'])}">
  <div class=cohead><div><h2>{e(co['name'])} <span>{e(co['ticker'])}</span></h2>
   <p class=muted>{e(co['industry'])}{' / ' + e(co['exchange']) if co['exchange'] else ''} /
-  <a href="{e(co['edgar_url'])}">All insider filings on EDGAR</a></p></div>
+  <a href="{e(co['edgar_url'])}">All insider filings on EDGAR</a></p>{ext_links(co)}</div>
   <dl class=facts>{''.join(f'<div><dt>{k}</dt><dd>{v}</dd></div>' for k, v in facts)}</dl></div>
  {cluster_note(co)}{mixed_note(co)}
  <div class=chartrow><div class=chartmain>{chart_svg(co)}</div>{range_panel(co)}</div>
@@ -441,6 +453,9 @@ h4{font-size:15px;margin:26px 0 8px;font-weight:700}
 .r52lab small{font-weight:400;color:var(--muted)}
 .r52cur{position:absolute;left:0;transform:translateY(50%);background:var(--sheet);padding:2px 0}
 .r52 .muted{font-size:12px;margin:10px 0 0}
+.ext{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 0}
+.ext a{font-size:13px;font-weight:600;text-decoration:none;border:1px solid var(--rule);padding:3px 10px;background:var(--sheet)}
+.ext a:hover{border-color:var(--ink)}
 .callout.mixed{background:color-mix(in srgb,var(--sell-bg) 80%,transparent);border-left-color:var(--sell)}
 details.track{border-top:1px solid var(--field);padding:8px 14px;font-size:14px}
 details.track[open] summary{margin-bottom:6px}.trsum{margin:4px 0 6px;font-weight:600}
