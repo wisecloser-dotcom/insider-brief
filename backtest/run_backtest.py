@@ -117,6 +117,27 @@ def main():
             else ctrl[pd.to_datetime(ctrl["entry_date"]) > pd.Timestamp(C.TRAIN_END)]
         comp.append(stats_row(f"CONTROL [{per}]", cp["ret"]))
 
+    # 4b. swing: insider trades vs no-insider control, raw and minus SPY over the same window
+    swing_rows = []
+    split = pd.Timestamp(C.TRAIN_END)
+    for name, v in C.VARIANTS.items():
+        if v["kind"] != "swing":
+            continue
+        hold = v["hold_days"]
+        tr = trades_out[name].copy()
+        tr["spy_ret"] = bt.spy_window_ret(spy, tr["entry_date"], hold)
+        trades_out[name] = tr
+        cs = bt.control_swing(prices, spy, runs, v, ind)
+        for who, df in (("insider", tr), ("control", cs)):
+            ed = pd.to_datetime(df["entry_date"])
+            for per, mask in (("all", ed == ed), ("train", ed <= split), ("test", ed > split)):
+                sub = df[mask]
+                for measure, r in (("raw", sub["ret"]), ("minus_spy", sub["ret"] - sub["spy_ret"])):
+                    swing_rows.append({"variant": name, "hold_days": hold, "group": who, "period": per,
+                                       "measure": measure, **bt.stats(r)})
+        print(f"{name}: {len(tr)} insider trades, {len(cs)} control windows")
+    swing_cmp = pd.DataFrame(swing_rows)
+
     # 5. sensitivity grid for Variant #2, train period only
     train = data[data["period"] == "train"]
     grid = []
@@ -143,11 +164,12 @@ def main():
     for name, tr in trades_out.items():
         cols = ["ticker", "signal_date", "entry_date", "first_filing", "value", "n_insiders", "titles",
                 "multiple_buys", "atr", "matr", "dvol", "gap", "spy_gap", "open", "close", "stop_pct",
-                "exit_reason", "ret", "period"]
+                "exit_reason", "ret", "spy_ret", "period"]
         tr[[c for c in cols if c in tr]].to_csv(C.RESULTS / f"trades_{name}.csv", index=False)
         if C.VARIANTS[name]["kind"] == "day" and len(tr):
             bt.equity_curve(tr).to_csv(C.RESULTS / f"equity_{name}.csv")
     grid.to_csv(C.RESULTS / "grid_day_v2_train.csv", index=False)
+    swing_cmp.to_csv(C.RESULTS / "swing_control.csv", index=False)
     cal.to_csv(C.RESULTS / "calibration.csv", index=False)
     pd.DataFrame(summary).to_csv(C.RESULTS / "summary.csv", index=False)
     pd.DataFrame(comp).to_csv(C.RESULTS / "comparison.csv", index=False)
@@ -177,6 +199,10 @@ def main():
         f"- Known trade check: {known_txt}\n",
         "## Does the insider buy matter?\n", md_table(comp, cols[:1] + cols[2:10]),
         "\n## Variants\n", md_table(summary, cols),
+        "\n## Swing: insider buy vs no-insider control\n",
+        "`raw` = return after costs; `minus_spy` = minus SPY over the same window. Control windows don't overlap per ticker.\n",
+        md_table([{**r, "strategy": f"{r['variant']} {r['group']} {r['measure']}"} for r in swing_cmp.to_dict("records")],
+                 ["strategy", "period", "n", "win_rate", "mean", "median", "t_stat"]),
         "\n## Variant #2 sensitivity (train period)\n",
         md_table(grid.to_dict("records"), gcols),
         "\n## Calibration vs the video\n", cal.round(4).to_markdown(index=False) if len(cal) else "no calibration tickers found",

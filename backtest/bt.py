@@ -258,3 +258,54 @@ def control_returns(prices, spy, ins_runs, v, ind, cost=C.COST_PER_SIDE):
         x["ticker"] = t
         out.append(x[["ticker", "entry_date", "ret"]])
     return pd.concat(out, ignore_index=True) if out else pd.DataFrame(columns=["ticker", "entry_date", "ret"])
+
+
+def spy_window_ret(spy, entry_dates, hold):
+    """SPY return from the open of entry_date to the close `hold` sessions later (same window as a trade)."""
+    idx = spy.index
+    pos = idx.get_indexer(pd.to_datetime(pd.Series(entry_dates)).values)
+    out = np.full(len(pos), np.nan)
+    ok = (pos >= 0) & (pos + hold - 1 < len(idx))
+    out[ok] = spy["Close"].values[pos[ok] + hold - 1] / spy["Open"].values[pos[ok]] - 1
+    return out
+
+
+def control_swing(prices, spy, ins_runs, v, ind, cost=C.COST_PER_SIDE):
+    """Swing control: same filters and holding period on stock-days with NO insider buy in the
+    prior 30 days. Windows are non-overlapping per ticker (every `hold`-th day) so one big move
+    isn't counted many times. Also returns each window's SPY return for market adjustment."""
+    hold = v["hold_days"]
+    look = np.timedelta64(C.REPEAT_LOOKBACK_DAYS, "D")
+    out = []
+    for t, df in prices.items():
+        if t == "SPY" or len(df) < hold + 30:
+            continue
+        i = np.arange(0, len(df) - hold)
+        i = i[i % hold == 0]
+        x = pd.DataFrame({
+            "signal_date": df.index[i], "entry_date": df.index[i + 1],
+            "atr": df[ind["atr"]].values[i], "matr": df[ind["matr"]].values[i],
+            "dvol": df[ind["dvol"]].values[i],
+            "open": df["Open"].values[i + 1], "exit_close": df["Close"].values[i + hold],
+        })
+        x["spy_gap"] = np.nan
+        x["repeat_buy"] = False
+        x = apply_filters(x, {**v, "spy_gate": False})
+        if x.empty:
+            continue
+        runs = ins_runs.get(t)
+        if runs is not None and len(runs):
+            sd = x["signal_date"].values
+            lo = np.searchsorted(runs, sd - look, side="left")
+            hi = np.searchsorted(runs, sd + np.timedelta64(1, "D"), side="left")
+            x = x[hi == lo]
+        if x.empty:
+            continue
+        x["ret"] = x["exit_close"] / x["open"] - 1 - 2 * cost
+        x["ticker"] = t
+        out.append(x[["ticker", "entry_date", "ret"]])
+    if not out:
+        return pd.DataFrame(columns=["ticker", "entry_date", "ret", "spy_ret"])
+    res = pd.concat(out, ignore_index=True)
+    res["spy_ret"] = spy_window_ret(spy, res["entry_date"], hold)
+    return res
