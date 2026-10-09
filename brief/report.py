@@ -1,5 +1,6 @@
 """The HTML brief: one self-contained page, opens in any browser, no internet needed to view."""
 import html
+import re
 from datetime import date
 
 import numpy as np
@@ -57,6 +58,11 @@ def nice_date(s) -> str:
 
 
 # ---------------------------------------------------------------------------
+def tkey(t: dict) -> str:
+    """Stable id for one trade, shared by the chart markers and the rows they point to."""
+    return re.sub(r"[^0-9A-Za-z]", "", str(t.get("accession", ""))) + str(t.get("code", ""))
+
+
 def chart_svg(co: dict) -> str:
     ch = co["chart"]
     if not ch or len(ch["close"]) < 5:
@@ -93,8 +99,10 @@ def chart_svg(co: dict) -> str:
             shape = f'<path d="M{x:.1f},{yy-r:.1f} L{x+r:.1f},{yy+r*.8:.1f} L{x-r:.1f},{yy+r*.8:.1f}Z" class="m buy{" hl" if t["headline"] else ""}"/>'
         else:
             shape = f'<path d="M{x:.1f},{yy+r:.1f} L{x+r:.1f},{yy-r*.8:.1f} L{x-r:.1f},{yy-r*.8:.1f}Z" class="m sell{" hl" if t["headline"] else ""}"/>'
-        dots.append(f'<g><title>{e(t["insider"])}: {t["side"].lower()} {money(t["value"])} '
-                    f'on {nice_date(t["trade_date"])} at {money(t["chart_price"])}</title>{shape}</g>')
+        dots.append(f'<g class=mk data-k="{tkey(t)}" tabindex=0 role=button '
+                    f'aria-label="Show {e(t["insider"])} {t["side"].lower()} on {nice_date(t["trade_date"])}">'
+                    f'<title>{e(t["insider"])}: {t["side"].lower()} {money(t["value"])} '
+                    f'on {nice_date(t["trade_date"])} at {money(t["chart_price"])}. Click to see the trade.</title>{shape}</g>')
     label = (f"Price of {co['ticker']} over the last 6 months, with {len(marks)} insider trades marked")
     return (f'<svg viewBox="0 0 {W} {H}" class=chart role=img aria-label="{e(label)}">'
             f'{"".join(grid)}{"".join(months)}'
@@ -147,7 +155,7 @@ def trade_block(t: dict, co: dict) -> str:
         ("Disclosed public holdings*", f"{money(w.get('total_after'))}<br><span class=muted>{vs_text}</span>"),
     ]
     return f"""
-<article class="trade {'buy' if buy else 'sell'}" data-side="{t['code']}" data-value="{t['value']:.0f}" data-plan="{int(t['plan_10b5_1'])}">
+<article id="tb-{tkey(t)}" class="trade {'buy' if buy else 'sell'}" data-side="{t['code']}" data-value="{t['value']:.0f}" data-plan="{int(t['plan_10b5_1'])}">
  <header><span class=side>{t['side']}</span><h3>{e(t['insider'])}</h3><p>{e(t['position'])}</p>
   <a href="{e(t['url'])}">Form 4 on EDGAR</a></header>
  <dl>{''.join(f'<div><dt>{k}</dt><dd>{v}</dd></div>' for k, v in fields)}</dl>
@@ -168,7 +176,7 @@ def related_table(co: dict) -> str:
     if not tr:
         return f"<p>No open-market insider trades in the last 90 days.</p>"
     rows = "".join(
-        f"<tr class=\"{'hl ' if t['headline'] else ''}{'buy' if t['code']=='P' else 'sell'}\" data-side=\"{t['code']}\" data-value=\"{t['value']:.0f}\" data-plan=\"{int(t['plan_10b5_1'])}\">"
+        f"<tr id=\"tr-{tkey(t)}\" class=\"{'hl ' if t['headline'] else ''}{'buy' if t['code']=='P' else 'sell'}\" data-side=\"{t['code']}\" data-value=\"{t['value']:.0f}\" data-plan=\"{int(t['plan_10b5_1'])}\">"
         f"<td>{nice_date(t['trade_date'])}</td><td>{e(t['insider'])}</td><td>{e(t['position'])}</td>"
         f"<td><span class=side>{t['side']}</span></td><td class=n>{money(t['value'])}</td>"
         f"<td class=n>{shares(t['held_after'])}</td><td>{'Yes' if t['plan_10b5_1'] else ''}</td>"
@@ -304,6 +312,10 @@ h4{font-size:15px;margin:26px 0 8px;font-weight:700}
 .chart{width:100%;height:auto;margin-top:18px;display:block}
 .chart text{font-size:11px;fill:var(--muted)}.chart .g{stroke:var(--field)}.chart .a{stroke:var(--rule)}
 .chart .line{fill:none;stroke:var(--ink);stroke-width:1.6;stroke-linejoin:round}
+.mk{cursor:pointer}.mk:hover path,.mk:focus path{stroke:var(--ink);stroke-width:2}.mk:focus{outline:none}
+.flash,tr.flash td{animation:flash 2.6s ease-out;outline:2px solid var(--mark);outline-offset:2px}
+@keyframes flash{0%,35%{background-color:color-mix(in srgb,var(--mark) 70%,transparent)}100%{background-color:transparent}}
+@media (prefers-reduced-motion:reduce){.flash,tr.flash td{animation:none;background-color:color-mix(in srgb,var(--mark) 40%,transparent)}}
 .m.buy{fill:var(--buy)}.m.sell{fill:var(--sell)}.m.hl{stroke:var(--mark);stroke-width:3;paint-order:stroke}
 .legend{font-size:12px;color:var(--muted);margin:4px 0 0}
 .k{display:inline-block;width:10px;height:10px;margin:0 6px 0 14px;vertical-align:-1px}

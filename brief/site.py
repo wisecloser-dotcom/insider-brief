@@ -442,6 +442,26 @@ def render_index(featured, cos, cfg, built_ts, window_days, clusters=None, intra
     return shell("Insider trades", sub, facts, body, built_ts, "status.json", note=note)
 
 
+JUMP_JS = r"""
+// Chart marker -> scroll to that trade (its detail card if it has one, else its table row) and flash it
+window.showTrades=function(keys){
+  const els=[];keys.forEach(k=>{const el=document.getElementById('tb-'+k)||document.getElementById('tr-'+k);if(el&&!els.includes(el))els.push(el)});
+  if(!els.length)return;
+  const smooth=!matchMedia('(prefers-reduced-motion: reduce)').matches;
+  els[0].scrollIntoView({behavior:smooth?'smooth':'auto',block:'center'});
+  els.forEach(el=>{el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');
+    setTimeout(()=>el.classList.remove('flash'),2700)});
+  if(!els[0].hasAttribute('tabindex'))els[0].setAttribute('tabindex','-1');
+  els[0].focus({preventScroll:true});
+};
+document.querySelectorAll('.chart .mk').forEach(m=>{
+  const go=()=>window.showTrades([m.dataset.k]);
+  m.addEventListener('click',go);
+  m.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();go()}});
+});
+"""
+
+
 TV_JS = r"""
 (function(){
 const box=document.getElementById('tvbox'),el=document.getElementById('tv');
@@ -469,7 +489,7 @@ const byDay={};
 D.trades.forEach(x=>{const day=snap(x.d);(byDay[day]=byDay[day]||[]).push(x)});
 const marks=D.trades.filter(x=>x.d>=D.t[0]).map(x=>({time:snap(x.d),position:x.s==='P'?'belowBar':'aboveBar',
   shape:x.s==='P'?'arrowUp':'arrowDown',color:x.s==='P'?css('--buy'):css('--sell'),size:x.h?1.1:0.8,
-  text:x.h?(x.s==='P'?'Buy ':'Sell ')+x.v:''})).sort((a,b)=>a.time<b.time?-1:a.time>b.time?1:0);
+  text:x.h?(x.s==='P'?'Buy ':'Sell ')+x.v:'',id:x.k})).sort((a,b)=>a.time<b.time?-1:a.time>b.time?1:0);
 L.createSeriesMarkers(candles,marks);
 // the trade you clicked: dashed line at the insider's price, and zoom to it
 const focus=(location.hash.match(/t=(\d{4}-\d{2}-\d{2})/)||[])[1];
@@ -494,7 +514,10 @@ const show=i=>{const t=D.t[i],chg=i?D.c[i]/D.c[i-1]-1:0;
   (byDay[t]||[]).forEach(x=>{h+='<br><span class='+(x.s==='P'?'up':'down')+'>'+(x.s==='P'?'Buy':'Sell')+
    '</span> '+x.n+' ('+x.r+') '+x.v+' at '+fmt(x.p)});lg.innerHTML=h};
 show(D.t.length-1);
-chart.subscribeCrosshairMove(p=>{if(!p.time){show(D.t.length-1);return}const i=D.t.indexOf(p.time);if(i>=0)show(i)});
+chart.subscribeCrosshairMove(p=>{el.style.cursor=(p.time&&byDay[p.time])?'pointer':'';
+  if(!p.time){show(D.t.length-1);return}const i=D.t.indexOf(p.time);if(i>=0)show(i)});
+chart.subscribeClick(p=>{const hit=p.hoveredObjectId&&D.trades.find(x=>x.k===p.hoveredObjectId);
+  const list=hit?[hit]:(p.time&&byDay[p.time])||[];if(list.length)window.showTrades(list.map(x=>x.k))});
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>chart.applyOptions(theme()));
 })();
 """
@@ -505,7 +528,8 @@ def tv_block(co: dict) -> str:
     if not o or len(o.get("t", [])) < 5:
         return ""
     trades = [{"d": (t.get("trade_date") or "")[:10], "s": t["code"], "p": round(t.get("chart_price") or t["price"], 4),
-               "v": money(t["value"]), "n": t["insider"], "r": t["position"], "h": bool(t.get("headline"))}
+               "v": money(t["value"]), "n": t["insider"], "r": t["position"], "h": bool(t.get("headline")),
+               "k": report.tkey(t)}
               for t in co["trades"] if t.get("trade_date")]
     data = json.dumps({**o, "trades": trades}).replace("</", "<\\/")
     ranges = "".join(f'<button type=button data-r={d}>{l}</button>'
@@ -524,6 +548,7 @@ def render_company(co, built_ts) -> str:
         section = section.replace(svg, tv + f"<div id=svgchart>{svg}</div>", 1)
     section = section.replace("Trades in this brief", "Traded in the last 7 days")
     body = (f'<a class=back href="../index.html">&larr; All insider trades</a>' + section
+            + f"<script>{JUMP_JS}</script>"
             + ('<script src="../assets/lightweight-charts.js"></script>'
                f"<script>{TV_JS}</script>" if tv else ""))
     return shell(f"{co['ticker']} insider trades: {co['name']}", "", [], body, built_ts,
