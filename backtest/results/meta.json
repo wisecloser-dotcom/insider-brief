@@ -1,0 +1,18 @@
+{
+  "insider_source": "openinsider",
+  "n_purchases": 90091,
+  "n_signals": 71755,
+  "price_coverage": 0.6279841126053933,
+  "period": [
+    "2015-01-02 08:26:05",
+    "2026-10-09 08:01:30"
+  ],
+  "train_end": "2021-12-31",
+  "cost_per_side": 0.0015,
+  "indicators": {
+    "atr": "atr_wilder",
+    "matr": "matr_asof",
+    "dvol": "dvol_1d"
+  },
+  "known_trade": "LW entry 2024-07-30: open 53.73 -> close 56.01 = 4.24% before costs; ATR 8.04%, $vol 280.4M, repeat=False; in Variant #2 trades: True"
+}

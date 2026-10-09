@@ -1,0 +1,10 @@
+7680 tickers: 0 cached, 0 known missing, 7680 to download
+  506 downloaded, 0 missing, 7174 queued, 3 min
+  1004 downloaded, 0 missing, 6676 queued, 7 min
+  1506 downloaded, 0 missing, 6174 queued, 11 min
+  2001 downloaded, 0 missing, 5679 queued, 14 min
+  2513 downloaded, 0 missing, 5167 queued, 18 min
+  3005 downloaded, 0 missing, 4675 queued, 21 min
+  3518 downloaded, 0 missing, 4162 queued, 25 min
+  4006 downloaded, 0 missing, 3674 queued, 29 min
+prices on disk for 4394 of 7680 tickers; 3286 confirmed missing; 0 not yet attempted
