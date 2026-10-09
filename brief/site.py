@@ -272,6 +272,7 @@ def shell(title, subtitle, facts, body, built_ts, status_url, script=True, note=
             f"<dl class=facts>{facts_html}</dl><p class=status>{status}</p></header>")
     return f"""<!doctype html><html lang=en><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1"><title>{e(title)}</title>
+<base target=_blank>
 <link rel=preconnect href=https://fonts.googleapis.com>
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel=stylesheet>
 <style>{report.CSS}{SITE_CSS}</style>
@@ -547,7 +548,7 @@ def render_company(co, built_ts) -> str:
     if tv and svg in section:   # interactive chart, with the simple chart as a no-script fallback
         section = section.replace(svg, tv + f"<div id=svgchart>{svg}</div>", 1)
     section = section.replace("Trades in this brief", "Traded in the last 7 days")
-    body = (f'<a class=back href="../index.html">&larr; All insider trades</a>' + section
+    body = (f'<a class=back href="../index.html" target=_self>&larr; All insider trades</a>' + section
             + f"<script>{JUMP_JS}</script>"
             + ('<script src="../assets/lightweight-charts.js"></script>'
                f"<script>{TV_JS}</script>" if tv else ""))

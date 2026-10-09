@@ -138,6 +138,7 @@ def test_full_site_build_with_awkward_data(tmp_path, monkeypatch):
     monkeypatch.setattr(market, "last_price", lambda t: None)
     monkeypatch.setattr(market, "market_cap_fallback", lambda t: None)
     monkeypatch.setattr(news, "headlines", lambda *a, **k: [])
+    monkeypatch.setattr(market, "intraday_batch", lambda tickers, **k: {})
 
     today = str(pd.Timestamp.today().date())
     atom = ATOM.replace(b"2026-10-08T", today.encode() + b"T")

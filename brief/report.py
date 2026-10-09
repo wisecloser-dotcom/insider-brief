@@ -150,7 +150,8 @@ def trade_block(t: dict, co: dict) -> str:
                                    f"<br><span class=muted>{money(t['chart_price'])} then, {money(co['price'])} now</span>")
                                   if t.get("since_trade") is not None else "n/a"),
         ("Share of company size", f"{pct(t['pct_mcap'])} of market cap<br><span class=muted>{adv_text} a typical day&rsquo;s trading</span>"),
-        ("Holding in " + e(co["ticker"]), f"{held_line}<br><span class=muted>Stake {stake}"
+        ("Holding in " + e(co["ticker"]), f"{held_line}<br><span class=muted>"
+                                          f"{stake if t['new_position'] else 'Stake ' + stake}"
                                           f"{'; ' + pct(t['pct_company_after']) + ' of the company' if t['pct_company_after'] else ''}</span>"),
         ("Disclosed public holdings*", f"{money(w.get('total_after'))}<br><span class=muted>{vs_text}</span>"),
     ]
