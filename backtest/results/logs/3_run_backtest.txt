@@ -1,6 +1,9 @@
 90091 insider purchases, price history for 4394 tickers
 indicator definitions chosen: {'atr': 'atr_wilder', 'matr': 'matr_asof', 'dvol': 'dvol_1d'}
 71755 signals, 45061 with usable prices (63%)
+swing_5d: 984 insider trades, 36932 control windows
+swing_10d: 982 insider trades, 18397 control windows
+swing_20d: 973 insider trades, 9066 control windows
 # Insider-buy strategy backtest
 
 - Insider data: **openinsider**, 90,091 purchases (2015-01-02 to 2026-10-09), 71,755 signals, 63% with price data
@@ -46,6 +49,50 @@ indicator definitions chosen: {'atr': 'atr_wilder', 'matr': 'matr_asof', 'dvol':
 | swing_20d | all | 973 | 52.72% | 3.65% | 1.26% | 3.76 | 1.48 | 21.26% | -16.00% |  |  |
 | swing_20d | train | 355 | 58.31% | 6.37% | 3.90% | 4.18 | 1.92 | 22.82% | -16.63% |  |  |
 | swing_20d | test | 618 | 49.51% | 2.08% | -0.30% | 1.66 | 1.26 | 20.20% | -15.70% |  |  |
+
+
+## Swing: insider buy vs no-insider control
+
+`raw` = return after costs; `minus_spy` = minus SPY over the same window. Control windows don't overlap per ticker.
+
+| strategy | period | n | win_rate | mean | median | t_stat |
+|---|---|---|---|---|---|---|
+| swing_5d insider raw | all | 984 | 52.34% | 1.59% | 0.41% | 2.62 |
+| swing_5d insider minus_spy | all | 984 | 50.81% | 1.32% | 0.21% | 2.27 |
+| swing_5d insider raw | train | 355 | 56.90% | 1.37% | 1.87% | 1.45 |
+| swing_5d insider minus_spy | train | 355 | 52.11% | 1.16% | 0.43% | 1.37 |
+| swing_5d insider raw | test | 629 | 49.76% | 1.72% | -0.09% | 2.19 |
+| swing_5d insider minus_spy | test | 629 | 50.08% | 1.40% | 0.01% | 1.82 |
+| swing_5d control raw | all | 36932 | 46.93% | 0.05% | -0.75% | 0.65 |
+| swing_5d control minus_spy | all | 36932 | 44.76% | -0.37% | -1.21% | -5.10 |
+| swing_5d control raw | train | 13291 | 48.11% | 0.66% | -0.50% | 4.64 |
+| swing_5d control minus_spy | train | 13291 | 44.90% | -0.05% | -1.19% | -0.41 |
+| swing_5d control raw | test | 23641 | 46.26% | -0.29% | -0.92% | -3.25 |
+| swing_5d control minus_spy | test | 23641 | 44.68% | -0.55% | -1.23% | -6.46 |
+| swing_10d insider raw | all | 982 | 54.68% | 2.21% | 1.15% | 3.41 |
+| swing_10d insider minus_spy | all | 982 | 50.41% | 1.29% | 0.15% | 2.11 |
+| swing_10d insider raw | train | 355 | 56.90% | 2.64% | 2.06% | 2.32 |
+| swing_10d insider minus_spy | train | 355 | 52.96% | 1.49% | 0.86% | 1.45 |
+| swing_10d insider raw | test | 627 | 53.43% | 1.97% | 0.85% | 2.50 |
+| swing_10d insider minus_spy | test | 627 | 48.96% | 1.18% | -0.20% | 1.54 |
+| swing_10d control raw | all | 18397 | 48.05% | 0.56% | -0.69% | 3.76 |
+| swing_10d control minus_spy | all | 18397 | 45.16% | -0.31% | -1.53% | -2.22 |
+| swing_10d control raw | train | 6697 | 51.13% | 1.85% | 0.44% | 7.23 |
+| swing_10d control minus_spy | train | 6697 | 46.42% | 0.31% | -1.08% | 1.27 |
+| swing_10d control raw | test | 11700 | 46.28% | -0.18% | -1.29% | -0.99 |
+| swing_10d control minus_spy | test | 11700 | 44.44% | -0.67% | -1.78% | -3.88 |
+| swing_20d insider raw | all | 973 | 52.72% | 3.65% | 1.26% | 3.76 |
+| swing_20d insider minus_spy | all | 973 | 47.79% | 1.87% | -0.97% | 2.02 |
+| swing_20d insider raw | train | 355 | 58.31% | 6.37% | 3.90% | 4.18 |
+| swing_20d insider minus_spy | train | 355 | 51.83% | 2.83% | 0.92% | 2.03 |
+| swing_20d insider raw | test | 618 | 49.51% | 2.08% | -0.30% | 1.66 |
+| swing_20d insider minus_spy | test | 618 | 45.47% | 1.33% | -1.55% | 1.09 |
+| swing_20d control raw | all | 9066 | 48.21% | 1.88% | -0.91% | 6.35 |
+| swing_20d control minus_spy | all | 9066 | 45.07% | 0.03% | -2.51% | 0.10 |
+| swing_20d control raw | train | 3306 | 51.72% | 4.76% | 1.12% | 8.92 |
+| swing_20d control minus_spy | train | 3306 | 47.43% | 1.51% | -1.43% | 2.99 |
+| swing_20d control raw | test | 5760 | 46.20% | 0.24% | -1.82% | 0.67 |
+| swing_20d control minus_spy | test | 5760 | 43.72% | -0.82% | -2.93% | -2.45 |
 
 
 ## Variant #2 sensitivity (train period)
