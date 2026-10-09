@@ -186,7 +186,7 @@ def company_section(co: dict, mode: str) -> str:
     facts = [("Price", money(co["price"])), ("6-month change", pct(co["chg_6m"], signed=True)),
              ("Market cap", money(co["market_cap"])), ("Typical day&rsquo;s trading", money(co["adv"]))]
     title = {"daily": "Trades in this brief", "ticker": "Last 30 days",
-             "site": "Trades filed in the last 7 days"}.get(mode, "Recent trades")
+             "site": "Trades in the last 7 days"}.get(mode, "Recent trades")
     return f"""
 <section class=co id="co-{e(co['ticker'] or co['cik'])}">
  <div class=cohead><div><h2>{e(co['name'])} <span>{e(co['ticker'])}</span></h2>

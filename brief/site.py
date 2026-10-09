@@ -133,8 +133,9 @@ def _featured(st: State, cfg: Config, window_days: int) -> list[dict]:
     cut = str(date.today() - timedelta(days=window_days))
     for t in st.trades:
         t["ticker"] = form4.clean_ticker(t.get("ticker"))
+    # the trade itself must be recent, not just the filing (late filings of old trades drop out)
     keep = [dict(t, joint_filers=list(t.get("joint_filers") or [])) for t in st.trades
-            if t["ticker"] and t["filing_date"] >= cut and (
+            if t["ticker"] and t["filing_date"] >= cut and (t.get("trade_date") or "") >= cut and (
                 (t["code"] == "P" and t["value"] >= cfg.min_buy_usd) or
                 (t["code"] == "S" and t["value"] >= cfg.min_sell_usd))]
     return form4.dedupe_joint(sorted(keep, key=lambda t: (t["filing_date"], t["accession"])))
@@ -312,14 +313,14 @@ def render_index(featured, cos, cfg, built_ts, window_days) -> str:
     bought = sum(t["value"] for t in featured if t["code"] == "P")
     sold = sum(t["value"] for t in featured if t["code"] == "S")
     facts = [("Trades", f"{len(featured):,}"), ("Bought", money(bought)), ("Sold", money(sold))]
-    sub = f"Filed on SEC EDGAR in the last {window_days} days"
+    sub = f"Traded in the last {window_days} days, from SEC EDGAR"
     note = (f"Open-market buys from {money(cfg.min_buy_usd)} and sells from {money(cfg.min_sell_usd)}.")
     return shell("Insider trades", sub, facts, body, built_ts, "status.json", note=note)
 
 
 def render_company(co, built_ts) -> str:
     body = (f'<a class=back href="../index.html">&larr; All insider trades</a>'
-            + report.company_section(co, "site").replace("Trades in this brief", "Filed in the last 7 days"))
+            + report.company_section(co, "site").replace("Trades in this brief", "Traded in the last 7 days"))
     return shell(f"{co['ticker']} insider trades: {co['name']}", "", [], body, built_ts,
                  "../status.json", compact=True)
 

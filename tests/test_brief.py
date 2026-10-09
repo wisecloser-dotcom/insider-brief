@@ -162,3 +162,17 @@ def test_tickers_dedupe_and_late():
                               dict(base, insider_cik="c", insider="Other Person", shares=5.0)])
     assert len(out) == 2 and out[0]["joint_filers"] == ["Fund GP LLC"]
     assert form4.days_late({"filing_date": "2026-10-08", "trade_date": "2026-09-01"}) == 37
+
+
+def test_front_page_needs_a_recent_trade_date(tmp_path):
+    from datetime import date, timedelta
+    from brief import site
+    from brief.config import Config
+    today, old = date.today(), date.today() - timedelta(days=22)
+    base = {"ticker": "AAA", "issuer_cik": "1", "insider_cik": "a", "insider": "X", "code": "P",
+            "value": 1e6, "shares": 1e4, "price": 100.0, "plan_10b5_1": False, "accession": "1",
+            "filing_date": str(today), "trade_date": str(today - timedelta(days=2))}
+    st = site.State(Config(data_dir=tmp_path))
+    st.trades = [base, dict(base, accession="2", insider_cik="b", trade_date=str(old))]
+    got = site._featured(st, Config(), 7)
+    assert [t["accession"] for t in got] == ["1"]   # filed today but traded 3 weeks ago: left out
