@@ -11,6 +11,9 @@ on:
       start:
         description: "Start date (YYYY-MM-DD)"
         default: "2015-01-01"
+      price_minutes:
+        description: "Max minutes to spend downloading prices (re-run to continue)"
+        default: "200"
 
 permissions:
   contents: write
@@ -22,7 +25,10 @@ concurrency:
 jobs:
   backtest:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 340
+    defaults:
+      run:
+        shell: bash -o pipefail {0}
     steps:
       - uses: actions/checkout@v4
 
@@ -33,7 +39,7 @@ jobs:
           cache-dependency-path: backtest/requirements.txt
 
       - name: Restore downloaded data
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: backtest/data
           key: backtest-data-${{ github.run_id }}
@@ -42,26 +48,41 @@ jobs:
       - run: pip install -r backtest/requirements.txt
 
       - name: Fetch insider purchases
-        run: python backtest/fetch_insiders.py --source ${{ inputs.source }} --start ${{ inputs.start }}
+        run: |
+          mkdir -p backtest/results/logs
+          python -u backtest/fetch_insiders.py --source ${{ inputs.source }} --start ${{ inputs.start }} 2>&1 | tee backtest/results/logs/1_fetch_insiders.txt
 
       - name: Fetch prices
-        run: python backtest/fetch_prices.py
+        run: python -u backtest/fetch_prices.py --max-minutes ${{ inputs.price_minutes }} 2>&1 | tee backtest/results/logs/2_fetch_prices.txt
 
       - name: Run backtest
-        run: python backtest/run_backtest.py
+        run: python -u backtest/run_backtest.py 2>&1 | tee backtest/results/logs/3_run_backtest.txt
+
+      # Everything below runs even if a step above failed, so progress and logs are kept.
+      - name: Save downloaded data
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: backtest/data
+          key: backtest-data-${{ github.run_id }}
 
       - name: Show summary on the run page
-        run: cat backtest/results/summary.md >> "$GITHUB_STEP_SUMMARY"
+        if: always()
+        run: |
+          if [ -f backtest/results/summary.md ]; then cat backtest/results/summary.md >> "$GITHUB_STEP_SUMMARY";
+          else echo "No summary - see backtest/results/logs" >> "$GITHUB_STEP_SUMMARY"; fi
 
-      - name: Commit results
+      - name: Commit results and logs
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
           git add backtest/results
-          git commit -m "Backtest results (${{ inputs.source }}, from ${{ inputs.start }})" || echo "No changes"
-          git push
+          git commit -m "Backtest results (${{ inputs.source }}, from ${{ inputs.start }}, run ${{ github.run_id }})" || echo "No changes"
+          git pull --rebase origin ${{ github.ref_name }} && git push
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: backtest-results
           path: backtest/results
