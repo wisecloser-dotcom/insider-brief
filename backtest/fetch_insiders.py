@@ -64,8 +64,8 @@ def _get(url, params=None, headers=None, tries=5):
 
 def parse_openinsider_html(html, kind="purchases"):
     try:
-        tables = pd.read_html(io.StringIO(html), attrs={"class": "tinytable"})
-    except ValueError:
+        tables = pd.read_html(io.StringIO(html), attrs={"class": "tinytable"}, flavor="lxml")
+    except Exception:  # noqa: BLE001 - no results table, or HTML lxml can't read
         return pd.DataFrame()
     if not tables:
         return pd.DataFrame()
@@ -128,7 +128,16 @@ def fetch_openinsider(start, end, kind="purchases"):
                       "nfl": "", "nfh": "", "nil": "", "nih": "", "nol": "", "noh": "",
                       "v2l": "", "v2h": "", "oc2l": "", "oc2h": "", "sortcol": "0",
                       "cnt": "1000", "page": str(page)}
-            r = _get(OI_URL, params=params, headers={"User-Agent": "Mozilla/5.0"})
+            for attempt in range(6):
+                r = _get(OI_URL, params=params, headers={"User-Agent": "Mozilla/5.0"})
+                if 'class="tinytable"' in r.text:
+                    break
+                wait = 30 * 2 ** attempt
+                print(f"  {a:%Y-%m} page {page}: no results table (likely rate-limited), waiting {wait}s")
+                time.sleep(wait)
+            else:
+                raise RuntimeError(f"OpenInsider kept returning pages without results for {a:%Y-%m}; "
+                                   "months downloaded so far are cached - re-run to continue")
             raw_n = _table_rows(r.text)
             df = parse_openinsider_html(r.text, kind)
             rows.append(df)
