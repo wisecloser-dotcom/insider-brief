@@ -80,6 +80,20 @@ def save_button(t: dict, co: dict | None, text: bool = False) -> str:
             f'aria-label="Save this trade" title="Save this trade">{"Save" if text else "&#9734;"}</button>')
 
 
+def header_star(co: dict) -> str:
+    """Star beside the ticker on a company page. Saves the trade you clicked through from
+    (picked by the #t=date in the address); defaults to the most recent trade this week."""
+    heads = sorted((t for t in co.get("trades", []) if t.get("headline")),
+                   key=lambda t: ((t.get("trade_date") or ""), t["value"]), reverse=True)
+    if not heads:
+        return ""
+    opts = html.escape(json.dumps([json.loads(html.unescape(save_payload(t, co))) for t in heads],
+                                  separators=(",", ":")), quote=True)
+    return (f' <button type=button class="star hstar" data-save="{save_payload(heads[0], co)}" '
+            f'data-opts="{opts}" aria-pressed=false aria-label="Save this trade" '
+            f'title="Save this trade">&#9734;</button>')
+
+
 def tkey(t: dict) -> str:
     """Stable id for one trade, shared by the chart markers and the rows they point to."""
     return re.sub(r"[^0-9A-Za-z]", "", str(t.get("accession", ""))) + str(t.get("code", ""))
@@ -347,7 +361,7 @@ def company_section(co: dict, mode: str) -> str:
              "site": "Trades in the last 7 days"}.get(mode, "Recent trades")
     return f"""
 <section class=co id="co-{e(co['ticker'] or co['cik'])}">
- <div class=cohead><div><h2>{e(co['name'])} <span>{e(co['ticker'])}</span></h2>
+ <div class=cohead><div><h2>{e(co['name'])} <span>{e(co['ticker'])}</span>{header_star(co) if mode == 'site' else ''}</h2>
   <p class=muted>{e(co['industry'])}{' / ' + e(co['exchange']) if co['exchange'] else ''} /
   <a href="{e(co['edgar_url'])}">All insider filings on EDGAR</a></p>{ext_links(co)}</div>
   <dl class=facts>{''.join(f'<div><dt>{k}</dt><dd>{v}</dd></div>' for k, v in facts)}</dl></div>
@@ -473,6 +487,7 @@ details.track[open] summary{margin-bottom:6px}.trsum{margin:4px 0 6px;font-weigh
 .star{font:inherit;cursor:pointer;background:none;border:1px solid var(--rule);color:var(--muted);
 padding:0 7px;line-height:1.5;font-size:15px}.star[aria-pressed=true]{color:#B8860B;border-color:#B8860B}
 .star.txt{font-size:13px;padding:1px 10px}
+.star.hstar{font-size:22px;line-height:1.2;padding:0 9px;vertical-align:4px;margin-left:6px}
 @media (prefers-color-scheme:dark){.star[aria-pressed=true]{color:var(--mark-ink,#F6E35A);border-color:currentColor}}
 @media (max-width:900px){.chartrow{grid-template-columns:1fr}.r52body{min-height:150px}}
 @media (max-width:560px){table.hold{font-size:12px}table.hold th,table.hold td{padding:5px 4px}

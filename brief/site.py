@@ -538,6 +538,10 @@ def render_index(featured, cos, cfg, built_ts, window_days, clusters=None, intra
 
 
 JUMP_JS = r"""
+// header star: save the trade you arrived from (#t=YYYY-MM-DD), else the most recent one
+(function(){const b=document.querySelector('.hstar');if(!b)return;
+ const d=(location.hash.match(/t=(\d{4}-\d{2}-\d{2})/)||[])[1];if(!d)return;
+ const hit=JSON.parse(b.dataset.opts).find(o=>o.td===d);if(hit)b.dataset.save=JSON.stringify(hit)})();
 // Chart marker -> scroll to that trade (its detail card if it has one, else its table row) and flash it
 window.showTrades=function(keys){
   const els=[];keys.forEach(k=>{const el=document.getElementById('tb-'+k)||document.getElementById('tr-'+k);if(el&&!els.includes(el))els.push(el)});
