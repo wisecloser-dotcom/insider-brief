@@ -14,6 +14,20 @@ on:
       price_minutes:
         description: "Max minutes to spend downloading prices (re-run to continue)"
         default: "200"
+      task:
+        description: "What to run: the strategy backtest, or the cluster-buy test"
+        default: backtest
+        type: choice
+        options: [backtest, cluster]
+      hold:
+        description: "Cluster test only: trading days to hold"
+        default: "20"
+      move:
+        description: "Cluster test only: max % the price may have moved since insiders bought"
+        default: "3"
+      window:
+        description: "Cluster test only: days within which 2+ insiders must buy"
+        default: "14"
 
 permissions:
   contents: write
@@ -56,7 +70,14 @@ jobs:
         run: python -u backtest/fetch_prices.py --max-minutes ${{ inputs.price_minutes }} 2>&1 | tee backtest/results/logs/2_fetch_prices.txt
 
       - name: Run backtest
+        if: inputs.task == 'backtest'
         run: python -u backtest/run_backtest.py 2>&1 | tee backtest/results/logs/3_run_backtest.txt
+
+      - name: Run cluster-buy test
+        if: inputs.task == 'cluster'
+        run: |
+          mkdir -p backtest/results/cluster
+          python -u backtest/cluster_test.py --hold ${{ inputs.hold }} --move ${{ inputs.move }} --window ${{ inputs.window }} 2>&1 | tee backtest/results/cluster/log.txt
 
       # Everything below runs even if a step above failed, so progress and logs are kept.
       - name: Save downloaded data
@@ -69,7 +90,8 @@ jobs:
       - name: Show summary on the run page
         if: always()
         run: |
-          if [ -f backtest/results/summary.md ]; then cat backtest/results/summary.md >> "$GITHUB_STEP_SUMMARY";
+          f=backtest/results/summary.md; [ "${{ inputs.task }}" = cluster ] && f=backtest/results/cluster/summary.md
+          if [ -f "$f" ]; then cat "$f" >> "$GITHUB_STEP_SUMMARY";
           else echo "No summary - see backtest/results/logs" >> "$GITHUB_STEP_SUMMARY"; fi
 
       - name: Commit results and logs
@@ -78,7 +100,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
           git add backtest/results
-          git commit -m "Backtest results (${{ inputs.source }}, from ${{ inputs.start }}, run ${{ github.run_id }})" || echo "No changes"
+          git commit -m "Backtest results (${{ inputs.task }}, ${{ inputs.source }}, from ${{ inputs.start }}, run ${{ github.run_id }})" || echo "No changes"
           git pull --rebase origin ${{ github.ref_name }} && git push
 
       - uses: actions/upload-artifact@v4
