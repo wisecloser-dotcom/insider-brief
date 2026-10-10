@@ -1,15 +1,25 @@
-  2025-01 page 3: no results table (likely rate-limited), waiting 30s
-  2025-01 page 3: no results table (likely rate-limited), waiting 60s
-  2025-01 page 3: no results table (likely rate-limited), waiting 120s
-  2025-01 page 3: no results table (likely rate-limited), waiting 240s
-  2025-01 page 3: no results table (likely rate-limited), waiting 480s
-  2025-01 page 3: no results table (likely rate-limited), waiting 960s
-Traceback (most recent call last):
-  File "/home/runner/work/insider-brief/insider-brief/backtest/fetch_insiders.py", line 245, in <module>
-    main()
-  File "/home/runner/work/insider-brief/insider-brief/backtest/fetch_insiders.py", line 221, in main
-    df = fetch_openinsider(a.start, a.end, kind="sales")
-         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/runner/work/insider-brief/insider-brief/backtest/fetch_insiders.py", line 139, in fetch_openinsider
-    raise RuntimeError(f"OpenInsider kept returning pages without results for {a:%Y-%m}; "
-RuntimeError: OpenInsider kept returning pages without results for 2025-01; months downloaded so far are cached - re-run to continue
+  2025-01 page 3: no results table, retrying in 30s
+  2025-01: page 3 is empty - end of results
+OpenInsider 2025-01: 1300 sales lines
+OpenInsider 2025-02: 2081 sales lines
+OpenInsider 2025-03: 2268 sales lines
+OpenInsider 2025-04: 878 sales lines
+OpenInsider 2025-05: 2163 sales lines
+OpenInsider 2025-06: 2074 sales lines
+OpenInsider 2025-07: 1280 sales lines
+OpenInsider 2025-08: 2414 sales lines
+OpenInsider 2025-09: 1931 sales lines
+OpenInsider 2025-10: 1314 sales lines
+OpenInsider 2025-11: 1990 sales lines
+OpenInsider 2025-12: 2191 sales lines
+OpenInsider 2026-01: 1302 sales lines
+OpenInsider 2026-02: 2239 sales lines
+OpenInsider 2026-03: 2503 sales lines
+OpenInsider 2026-04: 1440 sales lines
+OpenInsider 2026-05: 2560 sales lines
+OpenInsider 2026-06: 2542 sales lines
+OpenInsider 2026-07: 1391 sales lines
+OpenInsider 2026-08: 2849 sales lines
+OpenInsider 2026-09: 1925 sales lines
+OpenInsider 2026-10: 464 sales lines
+saved 451550 sales, 11717 tickers, 2005-01-03 07:31:55 -> 2026-10-09 21:30:08

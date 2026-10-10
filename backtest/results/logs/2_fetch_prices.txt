@@ -1,10 +1,5 @@
-7683 tickers: 0 cached, 0 known missing, 7683 to download
-  506 downloaded, 0 missing, 7177 queued, 3 min
-  1004 downloaded, 0 missing, 6679 queued, 6 min
-  1505 downloaded, 0 missing, 6178 queued, 9 min
-  2000 downloaded, 0 missing, 5683 queued, 13 min
-  2511 downloaded, 0 missing, 5172 queued, 16 min
-  3005 downloaded, 0 missing, 4678 queued, 19 min
-  3500 downloaded, 0 missing, 4183 queued, 22 min
-  4008 downloaded, 0 missing, 3675 queued, 25 min
-prices on disk for 4396 of 7683 tickers; 3287 confirmed missing; 0 not yet attempted
+12964 tickers: 0 cached, 3287 known missing, 9677 to download
+  500 downloaded, 3287 missing, 9177 queued, 3 min
+  1010 downloaded, 3287 missing, 8667 queued, 6 min
+  1500 downloaded, 3287 missing, 8177 queued, 10 min
+  2004 downloaded, 3287 missing, 7673 queued, 13 min
