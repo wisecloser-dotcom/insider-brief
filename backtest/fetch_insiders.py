@@ -128,16 +128,25 @@ def fetch_openinsider(start, end, kind="purchases"):
                       "nfl": "", "nfh": "", "nil": "", "nih": "", "nol": "", "noh": "",
                       "v2l": "", "v2h": "", "oc2l": "", "oc2h": "", "sortcol": "0",
                       "cnt": "1000", "page": str(page)}
-            for attempt in range(6):
+            # A page with no results table is either the end of the results (when the previous
+            # page was exactly full) or an error/rate-limit page. After page 1, one confirming
+            # retry is enough; page 1 must have results, so it gets a longer backoff.
+            tries = 6 if page == 1 else 2
+            r = None
+            for attempt in range(tries):
                 r = _get(OI_URL, params=params, headers={"User-Agent": "Mozilla/5.0"})
                 if 'class="tinytable"' in r.text:
                     break
-                wait = 30 * 2 ** attempt
-                print(f"  {a:%Y-%m} page {page}: no results table (likely rate-limited), waiting {wait}s")
-                time.sleep(wait)
+                if attempt < tries - 1:
+                    wait = 30 * 2 ** attempt
+                    print(f"  {a:%Y-%m} page {page}: no results table, retrying in {wait}s")
+                    time.sleep(wait)
             else:
-                raise RuntimeError(f"OpenInsider kept returning pages without results for {a:%Y-%m}; "
-                                   "months downloaded so far are cached - re-run to continue")
+                if page == 1:
+                    raise RuntimeError(f"OpenInsider kept returning pages without results for {a:%Y-%m}; "
+                                       "months downloaded so far are cached - re-run to continue")
+                print(f"  {a:%Y-%m}: page {page} is empty - end of results")
+                break
             raw_n = _table_rows(r.text)
             df = parse_openinsider_html(r.text, kind)
             rows.append(df)
