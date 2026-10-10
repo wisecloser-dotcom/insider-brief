@@ -284,6 +284,14 @@ background:none;border:1px solid var(--rule);padding:3px 10px;cursor:pointer}.sh
 .sp{display:inline-flex;align-items:center;gap:8px;justify-content:flex-end}
 .spark polyline{fill:none;stroke-width:1.6;stroke-linejoin:round}.spark .base{stroke:var(--muted);stroke-dasharray:2 2;stroke-width:1}
 .spark.up polyline{stroke:var(--buy)}.spark.down polyline{stroke:var(--sell)}.spark.up circle{fill:var(--buy)}.spark.down circle{fill:var(--sell)}
+.pick{cursor:pointer}article.trade.pick:hover{border-color:var(--ink)}
+table.rel tr.pick:hover td{background:color-mix(in srgb,var(--field) 60%,transparent)}
+table.rel tr.pick:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.taphint{font-weight:400;font-size:12px;color:var(--muted);margin-left:8px}
+.tvbox.flash{animation:flash 2.6s ease-out;outline:2px solid var(--mark);outline-offset:2px}
+.mk.pulse path{stroke:var(--ink);stroke-width:3;animation:pulse .9s ease-in-out 3}
+@keyframes pulse{50%{transform:scale(1.6);transform-box:fill-box;transform-origin:center}}
+@media (prefers-reduced-motion:reduce){.mk.pulse path{animation:none}.tvbox.flash{animation:none}}
 .tvbox{margin-top:18px;border:1px solid var(--rule);background:var(--sheet)}
 .tvbar{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:flex-start;padding:10px 12px;border-bottom:1px solid var(--field)}
 .ranges{display:flex;border:1px solid var(--rule)}
@@ -553,6 +561,22 @@ window.showTrades=function(keys){
   if(!els[0].hasAttribute('tabindex'))els[0].setAttribute('tabindex','-1');
   els[0].focus({preventScroll:true});
 };
+// Trade card or table row -> show it on the chart
+const onChart=k=>{
+  if(window.showOnChart&&window.showOnChart(k))return;
+  const m=document.querySelector('.chart .mk[data-k="'+k+'"]');if(!m)return;
+  m.closest('.chart').scrollIntoView({behavior:'smooth',block:'center'});
+  m.classList.remove('pulse');void m.getBoundingClientRect();m.classList.add('pulse');
+  setTimeout(()=>m.classList.remove('pulse'),2700)};
+const pickable=[...document.querySelectorAll('article.trade[id^="tb-"],table.rel tr[id^="tr-"]')];
+pickable.forEach(el=>{el.classList.add('pick');if(el.tagName==='TR')el.tabIndex=0;el.title='Show on the chart'});
+document.addEventListener('click',ev=>{
+  const el=ev.target.closest('article.trade[id^="tb-"],table.rel tr[id^="tr-"]');
+  if(!el||ev.target.closest('a,button,summary,details,textarea,input,label,select'))return;
+  if(String(window.getSelection&&getSelection()).length)return;   // selecting text, not tapping
+  onChart(el.id.slice(3))});
+document.addEventListener('keydown',ev=>{const el=ev.target.closest&&ev.target.closest('table.rel tr.pick');
+  if(el&&(ev.key==='Enter'||ev.key===' ')){ev.preventDefault();onChart(el.id.slice(3))}});
 document.querySelectorAll('.chart .mk').forEach(m=>{
   const go=()=>window.showTrades([m.dataset.k]);
   m.addEventListener('click',go);
@@ -592,12 +616,13 @@ D.trades.forEach(x=>{const day=snap(x.d);(byDay[day]=byDay[day]||[]).push(x)});
 const marks=D.trades.filter(x=>x.d>=D.t[0]).map(x=>({time:snap(x.d),position:x.s==='P'?'belowBar':'aboveBar',
   shape:x.s==='P'?'arrowUp':'arrowDown',color:x.s==='P'?css('--buy'):css('--sell'),size:x.h?1.1:0.8,
   text:x.h?(x.s==='P'?'Buy ':'Sell ')+x.v:'',id:x.k})).sort((a,b)=>a.time<b.time?-1:a.time>b.time?1:0);
-L.createSeriesMarkers(candles,marks);L.createSeriesMarkers(line,marks);
+const mps=[L.createSeriesMarkers(candles,marks),L.createSeriesMarkers(line,marks)];
 // the trade you clicked: dashed line at the insider's price, and zoom to it
 const focus=(location.hash.match(/t=(\d{4}-\d{2}-\d{2})/)||[])[1];
 const ft=focus&&D.trades.find(x=>x.d===focus&&x.h)||D.trades.find(x=>x.h);
-if(ft)[candles,line].forEach(s=>s.createPriceLine({price:ft.p,color:css('--ink'),lineWidth:1,lineStyle:2,
-  axisLabelVisible:true,title:(ft.s==='P'?'Insider buy ':'Insider sell ')+'$'+ft.p.toFixed(2)}));
+const plTitle=x=>(x.s==='P'?'Insider buy ':'Insider sell ')+'$'+x.p.toFixed(2);
+let pls=ft?[candles,line].map(s=>s.createPriceLine({price:ft.p,color:css('--ink'),lineWidth:1,lineStyle:2,
+  axisLabelVisible:true,title:plTitle(ft)})):null;
 // Candles / Line switch, remembered between visits
 const kinds=[...box.querySelectorAll('[data-kind]')];
 const setKind=k=>{candles.applyOptions({visible:k==='candles'});line.applyOptions({visible:k==='line'});
@@ -622,11 +647,31 @@ const show=i=>{const t=D.t[i],chg=i?D.c[i]/D.c[i-1]-1:0;
    ' <span class='+(chg>=0?'up':'down')+'>'+(chg>=0?'+':'')+(chg*100).toFixed(2)+'%</span>';
   (byDay[t]||[]).forEach(x=>{h+='<br><span class='+(x.s==='P'?'up':'down')+'>'+(x.s==='P'?'Buy':'Sell')+
    '</span> '+x.n+' ('+x.r+') '+x.v+' at '+fmt(x.p)});lg.innerHTML=h};
-show(D.t.length-1);
+let rest=D.t.length-1;   // the day the readout returns to: today, or the trade you tapped
+show(rest);
 chart.subscribeCrosshairMove(p=>{el.style.cursor=(p.time&&byDay[p.time])?'pointer':'';
-  if(!p.time){show(D.t.length-1);return}const i=D.t.indexOf(p.time);if(i>=0)show(i)});
+  if(!p.time){show(rest);return}const i=D.t.indexOf(p.time);if(i>=0)show(i)});
 chart.subscribeClick(p=>{const hit=p.hoveredObjectId&&D.trades.find(x=>x.k===p.hoveredObjectId);
   const list=hit?[hit]:(p.time&&byDay[p.time])||[];if(list.length)window.showTrades(list.map(x=>x.k))});
+// Trade in the page -> chart: zoom to it, enlarge and label its arrow, move the price line to it
+window.showOnChart=function(k){
+  const x=D.trades.find(t=>t.k===k);if(!x||x.d<D.t[0])return false;
+  const day=snap(x.d),i=D.t.indexOf(day);
+  mps.forEach(m=>m.setMarkers(marks.map(mk=>mk.id===k?{...mk,size:2.2,
+    text:(x.s==='P'?'Buy ':'Sell ')+x.v+' ('+x.n.split(' ')[0]+')',color:css('--ink')}:mk)));
+  if(pls)pls.forEach(pl=>pl.applyOptions({price:x.p,title:plTitle(x)}));
+  else pls=[candles,line].map(s=>s.createPriceLine({price:x.p,color:css('--ink'),lineWidth:1,lineStyle:2,
+    axisLabelVisible:true,title:plTitle(x)}));
+  btns.forEach(b=>b.setAttribute('aria-pressed','false'));
+  const from=back(day,30);chart.timeScale().setVisibleRange({from:from<D.t[0]?D.t[0]:from,to:last});
+  if(i>=0){rest=i;show(i)}
+  const smooth=!matchMedia('(prefers-reduced-motion: reduce)').matches;
+  box.scrollIntoView({behavior:smooth?'smooth':'auto',block:'start'});
+  box.classList.remove('flash');void box.offsetWidth;box.classList.add('flash');
+  setTimeout(()=>box.classList.remove('flash'),2700);
+  setTimeout(()=>{try{chart.setCrosshairPosition(x.p,day,candles.options().visible?candles:line)}catch(_){}},smooth?450:0);
+  return true;
+};
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{chart.applyOptions(theme());
   line.applyOptions({color:css('--ink')})});
 })();
@@ -670,6 +715,9 @@ def render_company(co, built_ts) -> str:
     if tv and svg in section:   # interactive chart, with the simple chart as a no-script fallback
         section = section.replace(svg, tv + f"<div id=svgchart>{svg}</div>", 1)
     section = section.replace("Trades in this brief", "Traded in the last 7 days")
+    hint = " <span class=taphint>Tap a trade to see it on the chart</span>"
+    section = re.sub(r"(<h4>(?:Trades|Traded) in the last 7 days)</h4>", r"\1" + hint + "</h4>", section, count=1)
+    section = re.sub(r"(<h4>Everyone trading [^<]* in the last 90 days)</h4>", r"\1" + hint + "</h4>", section, count=1)
     body = (f'<a class=back href="../index.html" target=_self>&larr; All insider trades</a>' + section
             + f"<script>{JUMP_JS}</script>"
             + ('<script src="../assets/lightweight-charts.js"></script>'
