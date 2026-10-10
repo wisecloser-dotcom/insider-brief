@@ -1,0 +1,277 @@
+OpenInsider 2005-01: 1412 sales lines
+OpenInsider 2005-02: 2291 sales lines
+OpenInsider 2005-03: 2259 sales lines
+OpenInsider 2005-04: 1261 sales lines
+OpenInsider 2005-05: 2216 sales lines
+OpenInsider 2005-06: 2146 sales lines
+OpenInsider 2005-07: 1538 sales lines
+OpenInsider 2005-08: 2895 sales lines
+OpenInsider 2005-09: 1971 sales lines
+OpenInsider 2005-10: 1234 sales lines
+OpenInsider 2005-11: 2689 sales lines
+OpenInsider 2005-12: 2162 sales lines
+OpenInsider 2006-01: 1614 sales lines
+OpenInsider 2006-02: 2256 sales lines
+OpenInsider 2006-03: 2772 sales lines
+OpenInsider 2006-04: 1745 sales lines
+OpenInsider 2006-05: 2815 sales lines
+OpenInsider 2006-06: 1924 sales lines
+OpenInsider 2006-07: 1248 sales lines
+OpenInsider 2006-08: 2416 sales lines
+OpenInsider 2006-09: 1725 sales lines
+OpenInsider 2006-10: 1551 sales lines
+OpenInsider 2006-11: 3018 sales lines
+OpenInsider 2006-12: 2185 sales lines
+OpenInsider 2007-01: 1714 sales lines
+OpenInsider 2007-02: 2664 sales lines
+OpenInsider 2007-03: 2518 sales lines
+OpenInsider 2007-04: 1750 sales lines
+OpenInsider 2007-05: 3332 sales lines
+OpenInsider 2007-06: 2341 sales lines
+OpenInsider 2007-07: 1609 sales lines
+OpenInsider 2007-08: 2868 sales lines
+OpenInsider 2007-09: 1997 sales lines
+OpenInsider 2007-10: 2119 sales lines
+OpenInsider 2007-11: 2478 sales lines
+OpenInsider 2007-12: 1970 sales lines
+OpenInsider 2008-01: 1214 sales lines
+OpenInsider 2008-02: 1774 sales lines
+OpenInsider 2008-03: 1788 sales lines
+OpenInsider 2008-04: 1650 sales lines
+OpenInsider 2008-05: 2554 sales lines
+OpenInsider 2008-06: 1802 sales lines
+OpenInsider 2008-07: 1173 sales lines
+OpenInsider 2008-08: 1765 sales lines
+OpenInsider 2008-09: 1367 sales lines
+OpenInsider 2008-10: 820 sales lines
+OpenInsider 2008-11: 1052 sales lines
+OpenInsider 2008-12: 1019 sales lines
+OpenInsider 2009-01: 575 sales lines
+OpenInsider 2009-02: 862 sales lines
+OpenInsider 2009-03: 938 sales lines
+OpenInsider 2009-04: 731 sales lines
+OpenInsider 2009-05: 1507 sales lines
+OpenInsider 2009-06: 1360 sales lines
+OpenInsider 2009-07: 1112 sales lines
+OpenInsider 2009-08: 2026 sales lines
+OpenInsider 2009-09: 1628 sales lines
+OpenInsider 2009-10: 1106 sales lines
+OpenInsider 2009-11: 1741 sales lines
+OpenInsider 2009-12: 1747 sales lines
+OpenInsider 2010-01: 1086 sales lines
+OpenInsider 2010-02: 1571 sales lines
+OpenInsider 2010-03: 2454 sales lines
+OpenInsider 2010-04: 1572 sales lines
+OpenInsider 2010-05: 1769 sales lines
+OpenInsider 2010-06: 1447 sales lines
+OpenInsider 2010-07: 873 sales lines
+OpenInsider 2010-08: 1473 sales lines
+OpenInsider 2010-09: 1391 sales lines
+OpenInsider 2010-10: 1087 sales lines
+OpenInsider 2010-11: 2193 sales lines
+OpenInsider 2010-12: 2220 sales lines
+OpenInsider 2011-01: 1185 sales lines
+OpenInsider 2011-02: 1859 sales lines
+OpenInsider 2011-03: 2224 sales lines
+OpenInsider 2011-04: 1327 sales lines
+OpenInsider 2011-05: 2140 sales lines
+OpenInsider 2011-06: 1388 sales lines
+OpenInsider 2011-07: 1003 sales lines
+OpenInsider 2011-08: 1017 sales lines
+OpenInsider 2011-09: 873 sales lines
+OpenInsider 2011-10: 813 sales lines
+OpenInsider 2011-11: 1341 sales lines
+OpenInsider 2011-12: 1399 sales lines
+OpenInsider 2012-01: 977 sales lines
+OpenInsider 2012-02: 1973 sales lines
+OpenInsider 2012-03: 2290 sales lines
+OpenInsider 2012-04: 1025 sales lines
+OpenInsider 2012-05: 1550 sales lines
+OpenInsider 2012-06: 1137 sales lines
+OpenInsider 2012-07: 909 sales lines
+OpenInsider 2012-08: 1913 sales lines
+OpenInsider 2012-09: 1608 sales lines
+OpenInsider 2012-10: 960 sales lines
+OpenInsider 2012-11: 2137 sales lines
+OpenInsider 2012-12: 2165 sales lines
+OpenInsider 2013-01: 1150 sales lines
+OpenInsider 2013-02: 1888 sales lines
+OpenInsider 2013-03: 2398 sales lines
+OpenInsider 2013-04: 1117 sales lines
+OpenInsider 2013-05: 2651 sales lines
+OpenInsider 2013-06: 1485 sales lines
+OpenInsider 2013-07: 1326 sales lines
+OpenInsider 2013-08: 2230 sales lines
+OpenInsider 2013-09: 1684 sales lines
+OpenInsider 2013-10: 1264 sales lines
+OpenInsider 2013-11: 2337 sales lines
+OpenInsider 2013-12: 1869 sales lines
+OpenInsider 2014-01: 1291 sales lines
+OpenInsider 2014-02: 2103 sales lines
+OpenInsider 2014-03: 2403 sales lines
+OpenInsider 2014-04: 1268 sales lines
+OpenInsider 2014-05: 2118 sales lines
+OpenInsider 2014-06: 1942 sales lines
+OpenInsider 2014-07: 1147 sales lines
+OpenInsider 2014-08: 1972 sales lines
+OpenInsider 2014-09: 1454 sales lines
+OpenInsider 2014-10: 1067 sales lines
+OpenInsider 2014-11: 2115 sales lines
+OpenInsider 2014-12: 1812 sales lines
+OpenInsider 2015-01: 1079 sales lines
+OpenInsider 2015-02: 1996 sales lines
+OpenInsider 2015-03: 2403 sales lines
+OpenInsider 2015-04: 1309 sales lines
+OpenInsider 2015-05: 2069 sales lines
+OpenInsider 2015-06: 1808 sales lines
+OpenInsider 2015-07: 1038 sales lines
+OpenInsider 2015-08: 1701 sales lines
+OpenInsider 2015-09: 1200 sales lines
+OpenInsider 2015-10: 1054 sales lines
+OpenInsider 2015-11: 1830 sales lines
+OpenInsider 2015-12: 1453 sales lines
+OpenInsider 2016-01: 593 sales lines
+OpenInsider 2016-02: 1266 sales lines
+OpenInsider 2016-03: 1821 sales lines
+OpenInsider 2016-04: 981 sales lines
+OpenInsider 2016-05: 1864 sales lines
+OpenInsider 2016-06: 1528 sales lines
+OpenInsider 2016-07: 926 sales lines
+OpenInsider 2016-08: 2325 sales lines
+OpenInsider 2016-09: 1390 sales lines
+OpenInsider 2016-10: 882 sales lines
+OpenInsider 2016-11: 2287 sales lines
+OpenInsider 2016-12: 1910 sales lines
+OpenInsider 2017-01: 1066 sales lines
+OpenInsider 2017-02: 2105 sales lines
+OpenInsider 2017-03: 2440 sales lines
+OpenInsider 2017-04: 1103 sales lines
+OpenInsider 2017-05: 2351 sales lines
+OpenInsider 2017-06: 1782 sales lines
+OpenInsider 2017-07: 933 sales lines
+OpenInsider 2017-08: 2021 sales lines
+OpenInsider 2017-09: 1559 sales lines
+OpenInsider 2017-10: 1216 sales lines
+OpenInsider 2017-11: 2231 sales lines
+OpenInsider 2017-12: 1823 sales lines
+OpenInsider 2018-01: 1243 sales lines
+OpenInsider 2018-02: 1745 sales lines
+OpenInsider 2018-03: 2134 sales lines
+OpenInsider 2018-04: 1027 sales lines
+OpenInsider 2018-05: 2359 sales lines
+OpenInsider 2018-06: 1943 sales lines
+OpenInsider 2018-07: 1032 sales lines
+OpenInsider 2018-08: 2312 sales lines
+OpenInsider 2018-09: 1496 sales lines
+OpenInsider 2018-10: 858 sales lines
+OpenInsider 2018-11: 1613 sales lines
+OpenInsider 2018-12: 1066 sales lines
+OpenInsider 2019-01: 904 sales lines
+OpenInsider 2019-02: 1801 sales lines
+OpenInsider 2019-03: 2131 sales lines
+OpenInsider 2019-04: 1175 sales lines
+OpenInsider 2019-05: 1960 sales lines
+OpenInsider 2019-06: 1545 sales lines
+OpenInsider 2019-07: 1230 sales lines
+OpenInsider 2019-08: 1806 sales lines
+OpenInsider 2019-09: 1487 sales lines
+OpenInsider 2019-10: 1037 sales lines
+OpenInsider 2019-11: 2030 sales lines
+OpenInsider 2019-12: 1725 sales lines
+OpenInsider 2020-01: 1157 sales lines
+OpenInsider 2020-02: 1889 sales lines
+OpenInsider 2020-03: 1420 sales lines
+OpenInsider 2020-04: 849 sales lines
+OpenInsider 2020-05: 1805 sales lines
+OpenInsider 2020-06: 1862 sales lines
+OpenInsider 2020-07: 1224 sales lines
+OpenInsider 2020-08: 2179 sales lines
+OpenInsider 2020-09: 1488 sales lines
+OpenInsider 2020-10: 1184 sales lines
+OpenInsider 2020-11: 2535 sales lines
+OpenInsider 2020-12: 2446 sales lines
+OpenInsider 2021-01: 1531 sales lines
+OpenInsider 2021-02: 2517 sales lines
+OpenInsider 2021-03: 3356 sales lines
+OpenInsider 2021-04: 1728 sales lines
+OpenInsider 2021-05: 2786 sales lines
+OpenInsider 2021-06: 2853 sales lines
+OpenInsider 2021-07: 1440 sales lines
+OpenInsider 2021-08: 2514 sales lines
+OpenInsider 2021-09: 2025 sales lines
+OpenInsider 2021-10: 1384 sales lines
+OpenInsider 2021-11: 2692 sales lines
+OpenInsider 2021-12: 1948 sales lines
+OpenInsider 2022-01: 1039 sales lines
+OpenInsider 2022-02: 1428 sales lines
+OpenInsider 2022-03: 2252 sales lines
+OpenInsider 2022-04: 1039 sales lines
+OpenInsider 2022-05: 1621 sales lines
+OpenInsider 2022-06: 1447 sales lines
+OpenInsider 2022-07: 728 sales lines
+OpenInsider 2022-08: 2184 sales lines
+OpenInsider 2022-09: 1261 sales lines
+OpenInsider 2022-10: 974 sales lines
+OpenInsider 2022-11: 2191 sales lines
+OpenInsider 2022-12: 1622 sales lines
+OpenInsider 2023-01: 1274 sales lines
+OpenInsider 2023-02: 2239 sales lines
+OpenInsider 2023-03: 2350 sales lines
+OpenInsider 2023-04: 924 sales lines
+OpenInsider 2023-05: 1951 sales lines
+OpenInsider 2023-06: 1991 sales lines
+OpenInsider 2023-07: 1113 sales lines
+OpenInsider 2023-08: 2344 sales lines
+OpenInsider 2023-09: 1566 sales lines
+OpenInsider 2023-10: 834 sales lines
+OpenInsider 2023-11: 1829 sales lines
+OpenInsider 2023-12: 2213 sales lines
+OpenInsider 2024-01: 1290 sales lines
+OpenInsider 2024-02: 2231 sales lines
+OpenInsider 2024-03: 2937 sales lines
+OpenInsider 2024-04: 1156 sales lines
+OpenInsider 2024-05: 2472 sales lines
+OpenInsider 2024-06: 1900 sales lines
+OpenInsider 2024-07: 1368 sales lines
+OpenInsider 2024-08: 2453 sales lines
+OpenInsider 2024-09: 1847 sales lines
+OpenInsider 2024-10: 1225 sales lines
+OpenInsider 2024-11: 2807 sales lines
+OpenInsider 2024-12: 2176 sales lines
+Traceback (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/site-packages/pandas/compat/_optional.py", line 158, in import_optional_dependency
+    module = importlib.import_module(name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1140, in _find_and_load_unlocked
+ModuleNotFoundError: No module named 'html5lib'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/insider-brief/insider-brief/backtest/fetch_insiders.py", line 236, in <module>
+    main()
+  File "/home/runner/work/insider-brief/insider-brief/backtest/fetch_insiders.py", line 212, in main
+    df = fetch_openinsider(a.start, a.end, kind="sales")
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/insider-brief/insider-brief/backtest/fetch_insiders.py", line 133, in fetch_openinsider
+    df = parse_openinsider_html(r.text, kind)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/insider-brief/insider-brief/backtest/fetch_insiders.py", line 67, in parse_openinsider_html
+    tables = pd.read_html(io.StringIO(html), attrs={"class": "tinytable"})
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/site-packages/pandas/io/html.py", line 1226, in read_html
+    return _parse(
+           ^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/site-packages/pandas/io/html.py", line 967, in _parse
+    parser = _parser_dispatch(flav)
+             ^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/site-packages/pandas/io/html.py", line 911, in _parser_dispatch
+    import_optional_dependency("html5lib")
+  File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/site-packages/pandas/compat/_optional.py", line 161, in import_optional_dependency
+    raise ImportError(msg) from err
+ImportError: `Import html5lib` failed.  Use pip or conda to install the html5lib package.
