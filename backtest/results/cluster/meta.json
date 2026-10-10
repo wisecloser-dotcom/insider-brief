@@ -1,0 +1,11 @@
+{
+  "hold": 20,
+  "move_pct": 3.0,
+  "window_days": 14,
+  "clusters_found": 10484,
+  "clusters_with_prices": 6495,
+  "flat_clusters": 3218,
+  "flat_tradeable": 2293,
+  "median_lag_sessions": 2.0,
+  "cost_per_side": 0.0015
+}

@@ -1,0 +1,56 @@
+# Cluster-buy test: hold 20 sessions, price within ±3%
+
+- 10,484 cluster signals (2+ insiders within 14 days); 6,495 with prices; 3,218 within ±3% (2,293 tradeable: $1+ price, $1M+/day volume)
+- Median 2 sessions between the first insider trade and when you could buy
+
+
+## all
+
+| group | period | trades | profitable | win rate | beat SPY | avg | median | avg minus SPY | t |
+|---|---|---|---|---|---|---|---|---|---|
+| Cluster buy, price within ±3% (your test) | all | 3,193 | 1,697 | 53.1% | 48.1% | +1.32% | +0.68% | +0.32% | 1.26 |
+| Cluster buy, price already up >3% | all | 1,939 | 958 | 49.4% | 46.0% | +2.13% | -0.20% | +1.08% | 1.59 |
+| Cluster buy, price already down >3% | all | 1,318 | 715 | 54.2% | 47.3% | +2.28% | +1.63% | +0.16% | 0.27 |
+| Every cluster buy | all | 6,450 | 3,370 | 52.2% | 47.3% | +1.76% | +0.56% | +0.51% | 1.93 |
+| Single insider buy, price within ±3% | all | 11,453 | 5,989 | 52.3% | 46.7% | +1.64% | +0.42% | +0.68% | 1.49 |
+| No insider buy, price within ±3% (control) | all | 289,273 | 138,892 | 48.0% | 43.3% | +12.85% | -0.30% | +11.96% | 2.75 |
+| Cluster buy, price within ±3% (your test) | 2015-2021 | 1,717 | 954 | 55.6% | 49.4% | +1.36% | +0.97% | +0.39% | 1.20 |
+| Single insider buy, price within ±3% | 2015-2021 | 6,140 | 3,370 | 54.9% | 48.0% | +2.30% | +0.84% | +1.23% | 1.47 |
+| No insider buy, price within ±3% (control) | 2015-2021 | 164,455 | 81,746 | 49.7% | 44.1% | +10.31% | -0.05% | +9.52% | 2.43 |
+| Cluster buy, price within ±3% (your test) | 2022-now | 1,476 | 743 | 50.3% | 46.5% | +1.26% | +0.07% | +0.24% | 0.59 |
+| Single insider buy, price within ±3% | 2022-now | 5,313 | 2,619 | 49.3% | 45.3% | +0.87% | -0.20% | +0.05% | 0.24 |
+| No insider buy, price within ±3% (control) | 2022-now | 124,818 | 57,146 | 45.8% | 42.3% | +16.18% | -0.30% | +15.16% | 1.75 |
+| Your test, without the 10 best trades | all | 3,183 | 1,687 | 53.0% | 47.9% | +0.98% | +0.63% | -0.01% | -0.03 |
+
+## tradeable
+
+| group | period | trades | profitable | win rate | beat SPY | avg | median | avg minus SPY | t |
+|---|---|---|---|---|---|---|---|---|---|
+| Cluster buy, price within ±3% (your test) | all | 2,273 | 1,242 | 54.6% | 48.4% | +1.13% | +1.02% | +0.08% | 0.32 |
+| Cluster buy, price already up >3% | all | 1,334 | 666 | 49.9% | 46.4% | +1.47% | -0.00% | +0.49% | 0.94 |
+| Cluster buy, price already down >3% | all | 925 | 530 | 57.3% | 49.0% | +2.65% | +2.65% | +0.32% | 0.52 |
+| Every cluster buy | all | 4,532 | 2,438 | 53.8% | 47.9% | +1.54% | +1.01% | +0.25% | 1.06 |
+| Single insider buy, price within ±3% | all | 8,199 | 4,344 | 53.0% | 47.1% | +0.90% | +0.58% | -0.04% | -0.35 |
+| No insider buy, price within ±3% (control) | all | 188,902 | 96,005 | 50.8% | 44.7% | +0.14% | +0.14% | -0.74% | -25.54 |
+| Cluster buy, price within ±3% (your test) | 2015-2021 | 1,176 | 665 | 56.5% | 49.7% | +1.03% | +1.22% | +0.03% | 0.10 |
+| Single insider buy, price within ±3% | 2015-2021 | 4,335 | 2,428 | 56.0% | 48.8% | +1.14% | +1.08% | +0.07% | 0.48 |
+| No insider buy, price within ±3% (control) | 2015-2021 | 106,963 | 55,745 | 52.1% | 45.4% | +0.15% | +0.35% | -0.61% | -16.45 |
+| Cluster buy, price within ±3% (your test) | 2022-now | 1,097 | 577 | 52.6% | 46.9% | +1.24% | +0.72% | +0.14% | 0.33 |
+| Single insider buy, price within ±3% | 2022-now | 3,864 | 1,916 | 49.6% | 45.2% | +0.62% | -0.13% | -0.17% | -0.87 |
+| No insider buy, price within ±3% (control) | 2022-now | 81,939 | 40,260 | 49.1% | 43.6% | +0.11% | -0.17% | -0.91% | -19.76 |
+| Your test, without the 10 best trades | all | 2,263 | 1,232 | 54.4% | 48.2% | +0.78% | +0.95% | -0.26% | -1.11 |
+
+## By hold length (avg minus SPY)
+
+|                   |   cluster_flat |   control |
+|:------------------|---------------:|----------:|
+| ('all', 5)        |         0.005  |    0.0333 |
+| ('all', 10)       |         0.0056 |    0.0558 |
+| ('all', 20)       |         0.0032 |    0.1196 |
+| ('all', 40)       |        -0      |    0.1862 |
+| ('all', 60)       |         0.0062 |    0.2468 |
+| ('tradeable', 5)  |         0.0014 |   -0.0039 |
+| ('tradeable', 10) |         0.0004 |   -0.0052 |
+| ('tradeable', 20) |         0.0008 |   -0.0074 |
+| ('tradeable', 40) |        -0.0034 |   -0.0108 |
+| ('tradeable', 60) |         0.0056 |   -0.0129 |
