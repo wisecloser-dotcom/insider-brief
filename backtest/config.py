@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parent
 DATA = Path(os.environ.get("BT_DATA_DIR", ROOT / "data"))
 RESULTS = Path(os.environ.get("BT_RESULTS_DIR", ROOT / "results"))
 
-START = "2015-01-01"
+START = os.environ.get("BT_START") or "2015-01-01"   # set BT_START to extend history
 TRAIN_END = "2021-12-31"          # fit/explore on <= this, judge on after it
 
 MIN_VALUE = 25_000                # (VIDEO) OpenInsider "Latest Insider Purchases 25k+"

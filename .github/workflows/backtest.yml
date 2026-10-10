@@ -18,7 +18,7 @@ on:
         description: "What to run: the strategy backtest, or the cluster-buy test"
         default: backtest
         type: choice
-        options: [backtest, cluster]
+        options: [backtest, cluster, strategy]
       hold:
         description: "Cluster test only: trading days to hold"
         default: "20"
@@ -28,6 +28,12 @@ on:
       window:
         description: "Cluster test only: days within which 2+ insiders must buy"
         default: "14"
+      tp:
+        description: "Strategy only: take-profit % within the first 5 trading days (0 = none)"
+        default: "10"
+      hold_days:
+        description: "Strategy only: calendar days to hold if no take-profit or cluster sell"
+        default: "30"
 
 permissions:
   contents: write
@@ -40,6 +46,8 @@ jobs:
   backtest:
     runs-on: ubuntu-latest
     timeout-minutes: 340
+    env:
+      BT_START: ${{ inputs.start }}
     defaults:
       run:
         shell: bash -o pipefail {0}
@@ -66,6 +74,10 @@ jobs:
           mkdir -p backtest/results/logs
           python -u backtest/fetch_insiders.py --source ${{ inputs.source }} --start ${{ inputs.start }} 2>&1 | tee backtest/results/logs/1_fetch_insiders.txt
 
+      - name: Fetch insider sales
+        if: inputs.task == 'strategy'
+        run: python -u backtest/fetch_insiders.py --kind sales --start ${{ inputs.start }} 2>&1 | tee backtest/results/logs/1b_fetch_sales.txt
+
       - name: Fetch prices
         run: python -u backtest/fetch_prices.py --max-minutes ${{ inputs.price_minutes }} 2>&1 | tee backtest/results/logs/2_fetch_prices.txt
 
@@ -79,6 +91,12 @@ jobs:
           mkdir -p backtest/results/cluster
           python -u backtest/cluster_test.py --hold ${{ inputs.hold }} --move ${{ inputs.move }} --window ${{ inputs.window }} 2>&1 | tee backtest/results/cluster/log.txt
 
+      - name: Run strategy test
+        if: inputs.task == 'strategy'
+        run: |
+          mkdir -p backtest/results/strategy
+          python -u backtest/strategy_test.py --tp ${{ inputs.tp }} --move ${{ inputs.move }} --hold ${{ inputs.hold_days }} --window ${{ inputs.window }} 2>&1 | tee backtest/results/strategy/log.txt
+
       # Everything below runs even if a step above failed, so progress and logs are kept.
       - name: Save downloaded data
         if: always()
@@ -90,7 +108,7 @@ jobs:
       - name: Show summary on the run page
         if: always()
         run: |
-          f=backtest/results/summary.md; [ "${{ inputs.task }}" = cluster ] && f=backtest/results/cluster/summary.md
+          f=backtest/results/summary.md; [ "${{ inputs.task }}" = cluster ] && f=backtest/results/cluster/summary.md; [ "${{ inputs.task }}" = strategy ] && f=backtest/results/strategy/summary.md
           if [ -f "$f" ]; then cat "$f" >> "$GITHUB_STEP_SUMMARY";
           else echo "No summary - see backtest/results/logs" >> "$GITHUB_STEP_SUMMARY"; fi
 

@@ -62,7 +62,7 @@ def _get(url, params=None, headers=None, tries=5):
     raise RuntimeError(f"failed: {url}")
 
 
-def parse_openinsider_html(html):
+def parse_openinsider_html(html, kind="purchases"):
     try:
         tables = pd.read_html(io.StringIO(html), attrs={"class": "tinytable"})
     except ValueError:
@@ -91,12 +91,24 @@ def parse_openinsider_html(html):
         "value": pick("value").map(_num),
         "delta_own": pick("δown", "Δown".lower(), "deltaown").map(_num),
     })
-    out = out[out["trade_type"].str.startswith("P")]
+    if kind == "sales":
+        out = out[out["trade_type"].str.strip() == "S - Sale"]   # plain open-market sales, not Sale+OE
+    else:
+        out = out[out["trade_type"].str.startswith("P")]
     return out.dropna(subset=["filing_dt", "ticker"])
 
 
-def fetch_openinsider(start, end):
-    cache = C.DATA / "openinsider"
+def _table_rows(html):
+    """Rows in the results table before type filtering (to know if another page exists)."""
+    i = html.find('class="tinytable"')
+    if i < 0:
+        return 0
+    j = html.find("</table>", i)
+    return max(html.count("<tr", i, j if j > 0 else None) - 1, 0)
+
+
+def fetch_openinsider(start, end, kind="purchases"):
+    cache = C.DATA / ("openinsider" if kind == "purchases" else "openinsider_sales")
     cache.mkdir(parents=True, exist_ok=True)
     frames = []
     this_month = pd.Timestamp(date.today()).replace(day=1)
@@ -109,21 +121,25 @@ def fetch_openinsider(start, end):
         while True:
             params = {"s": "", "o": "", "pl": "", "ph": "", "ll": "", "lh": "", "fd": "-1",
                       "fdr": f"{a:%m/%d/%Y} - {b:%m/%d/%Y}", "td": "0", "tdr": "",
-                      "fdlyl": "", "fdlyh": "", "daysago": "", "xp": "1",
+                      "fdlyl": "", "fdlyh": "", "daysago": "",
+                      **({"xp": "1"} if kind == "purchases" else {"xs": "1"}),
                       "vl": str(C.MIN_VALUE // 1000), "vh": "", "ocl": "", "och": "",
                       "sic1": "-1", "sicl": "100", "sich": "9999", "grp": "0",
                       "nfl": "", "nfh": "", "nil": "", "nih": "", "nol": "", "noh": "",
                       "v2l": "", "v2h": "", "oc2l": "", "oc2h": "", "sortcol": "0",
                       "cnt": "1000", "page": str(page)}
             r = _get(OI_URL, params=params, headers={"User-Agent": "Mozilla/5.0"})
-            df = parse_openinsider_html(r.text)
+            raw_n = _table_rows(r.text)
+            df = parse_openinsider_html(r.text, kind)
             rows.append(df)
             time.sleep(1.5)
-            if len(df) < 1000 or page >= 20:
+            if raw_n < 1000 or page >= 40:
+                if page >= 40:
+                    print(f"  WARNING {a:%Y-%m}: hit the 40-page cap, some {kind} may be missing")
                 break
             page += 1
         df = pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
-        print(f"OpenInsider {a:%Y-%m}: {len(df)} purchase lines")
+        print(f"OpenInsider {a:%Y-%m}: {len(df)} {kind} lines")
         df.to_csv(f, index=False)
         frames.append(df)
     df = pd.concat(frames, ignore_index=True)
@@ -189,8 +205,17 @@ def main():
     ap.add_argument("--source", default="openinsider", choices=["openinsider", "sec"])
     ap.add_argument("--start", default=C.START)
     ap.add_argument("--end", default=str(date.today()))
+    ap.add_argument("--kind", default="purchases", choices=["purchases", "sales"])
     a = ap.parse_args()
     C.DATA.mkdir(parents=True, exist_ok=True)
+    if a.kind == "sales":
+        df = fetch_openinsider(a.start, a.end, kind="sales")
+        df = df[df["value"].abs() >= C.MIN_VALUE]
+        df = df[df["ticker"].str.fullmatch(r"[A-Z][A-Z0-9.\-]{0,6}", na=False)].drop_duplicates()
+        df.to_parquet(C.DATA / "sales.parquet", index=False)
+        print(f"saved {len(df)} sales, {df['ticker'].nunique()} tickers, "
+              f"{df['filing_dt'].min()} -> {df['filing_dt'].max()}")
+        return
     if a.source == "openinsider":
         try:
             df = fetch_openinsider(a.start, a.end)

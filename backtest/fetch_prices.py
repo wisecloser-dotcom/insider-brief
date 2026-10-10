@@ -12,6 +12,7 @@ Known limitation: delisted tickers are often missing from Yahoo, which biases re
 upward (survivorship bias). They are listed in results/missing_prices.txt.
 """
 import argparse
+import json
 import logging
 import os
 import sys
@@ -26,6 +27,8 @@ import config as C  # noqa: E402
 PX = C.DATA / "prices"
 MISSING = C.DATA / "missing_prices.txt"     # cached across runs: confirmed-missing tickers
 ATTEMPTS = C.DATA / "failed_once.txt"       # failed once in a normal chunk
+HIST = C.DATA / "price_history_start.json"  # start date each cached file was downloaded from
+OLD_DEFAULT_START = "2014-05-01"            # files cached before this marker existed
 CHUNK = 25
 
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
@@ -69,7 +72,7 @@ def main():
     C.RESULTS.mkdir(parents=True, exist_ok=True)
 
     ins = pd.read_parquet(C.DATA / "insiders.parquet")
-    priority = ["SPY"] + [c[0] for c in C.CALIBRATION]
+    priority = ["SPY", "IWM"] + [c[0] for c in C.CALIBRATION]
     rest = sorted(set(ins["ticker"]) - set(priority))
     tickers = priority + rest
     start = (pd.Timestamp(C.START) - pd.DateOffset(months=8)).strftime("%Y-%m-%d")
@@ -77,8 +80,11 @@ def main():
 
     missing = set() if a.retry_missing else _read_set(MISSING) - set(priority)
     failed_once = _read_set(ATTEMPTS)
+    hist = json.loads(HIST.read_text()) if HIST.exists() else {}
+    # A cached file is reusable only if it is recent AND was downloaded from at least as far back
+    # as this run needs (extending BT_START to earlier years re-downloads everything once).
     have = {f.stem for f in PX.glob("*.parquet")
-            if pd.Timestamp(f.stat().st_mtime, unit="s") > stale}
+            if pd.Timestamp(f.stat().st_mtime, unit="s") > stale and hist.get(f.stem, OLD_DEFAULT_START) <= start}
     todo = [t for t in tickers if t not in have and t not in missing]
     print(f"{len(tickers)} tickers: {len(have)} cached, {len(missing)} known missing, {len(todo)} to download")
 
@@ -98,6 +104,7 @@ def main():
             df.index = pd.to_datetime(df.index).tz_localize(None)
             df.to_parquet(PX / f"{t}.parquet")
             failed_once.discard(t)
+            hist[t] = start
         throttled = False
         if not ok or (len(chunk) >= 5 and len(ok) <= 1):
             # A chunk of delisted tickers also fails entirely, so confirm with a canary.
@@ -122,6 +129,7 @@ def main():
                   f"{(time.time() - t0) / 60:.0f} min")
         MISSING.write_text("\n".join(sorted(missing)))
         ATTEMPTS.write_text("\n".join(sorted(failed_once)))
+        HIST.write_text(json.dumps(hist))
         time.sleep(3)
 
     MISSING.write_text("\n".join(sorted(missing)))
